@@ -1,0 +1,6 @@
+A ANY B C D
+B AND A C
+C XOR A B
+D ID D
+E ID B
+F ID F
