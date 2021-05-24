@@ -1,7 +1,8 @@
+use nalgebra as na;
 use minilp::{LinearExpr, Problem, Solution};
 
 
-fn check_dimension(P: &Vec<f64>, Q: &Vec<f64>) -> usize {
+fn check_dimension(P: &na::DVector<f64>, Q: &na::DVector<f64>) -> usize {
     let ndim = P.len();
     assert!(ndim > 0);
     assert!(Q.len() == ndim);
@@ -15,7 +16,7 @@ fn generate_empty_exprs(capacity: usize) -> Vec<LinearExpr> {
     vec
 }
 
-pub fn calc_emd_for_mechanism(P: &Vec<f64>, Q: &Vec<f64>) -> Solution {
+pub fn calc_emd_for_mechanism(P: &na::DVector<f64>, Q: &na::DVector<f64>) -> Solution {
     let ndim = check_dimension(P, Q);
     let mut problem = Problem::new(minilp::OptimizationDirection::Minimize);
     let mut sum_rows = generate_empty_exprs(ndim);
