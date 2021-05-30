@@ -3,7 +3,7 @@ use nalgebra as na;
 use crate::bitwise::{change_bases, generate_bases_from_mask, get_masked_counter};
 
 
-fn normalize_repertoire(repertoire: &mut na::DVector<f64>) {
+pub fn normalize_repertoire(repertoire: &mut na::DVector<f64>) {
     let norm_term = 1.0 / repertoire.sum();
     repertoire.apply(|x| x * norm_term);
 }
