@@ -94,62 +94,62 @@ fn test_calc_cause_repertoire() {
     let tpm = generate_reference_tpm();
     let current_state = generate_reference_state();
 
-    let mut current_masks = Vec::<usize>::new();
     let mut past_masks = Vec::<usize>::new();
+    let mut current_masks = Vec::<usize>::new();
     let mut expected = Vec::<na::DVector<f64>>::new();
 
     // CASE 0, Fig.4 p(ABC^p|A^c=1)
-    current_masks.push(0b001);
     past_masks.push(0b111);
+    current_masks.push(0b001);
     let mut e_0 = na::DVector::<f64>::from_vec(vec![0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]);
     normalize_repertoire(&mut e_0);
     expected.push(e_0);
 
     // CASE 1, Fig.10 p(AB^p|C^c), ,
-    current_masks.push(0b100);
     past_masks.push(0b011);
+    current_masks.push(0b100);
     let mut e_1 = na::DVector::<f64>::from_vec(vec![1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0]);
     normalize_repertoire(&mut e_1);
     expected.push(e_1);
 
     // CASE 2, Fig.10 p(AC^p|B^c)
-    current_masks.push(0b010);
     past_masks.push(0b101);
+    current_masks.push(0b010);
     let mut e_2 = na::DVector::<f64>::from_vec(vec![1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 0.0]);
     normalize_repertoire(&mut e_2);
     expected.push(e_2);
 
     // CASE 3, Fig.10 p(BC^p|A^c)
-    current_masks.push(0b001);
     past_masks.push(0b110);
+    current_masks.push(0b001);
     let mut e_3 = na::DVector::<f64>::from_vec(vec![0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]);
     normalize_repertoire(&mut e_3);
     expected.push(e_3);
 
     // CASE 4, Fig.10 p(ABC^p|ABC^c)
-    current_masks.push(0b111);
     past_masks.push(0b111);
+    current_masks.push(0b111);
     let mut e_4 = na::DVector::<f64>::from_vec(vec![0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0]);
     normalize_repertoire(&mut e_4);
     expected.push(e_4);
 
     // CASE 5, Fig.10 p(AB^p|BC^c)
-    current_masks.push(0b110);
     past_masks.push(0b011);
+    current_masks.push(0b110);
     let mut e_5 = na::DVector::<f64>::from_vec(vec![2.0, 0.0, 0.0, 1.0, 2.0, 0.0, 0.0, 1.0]);
     normalize_repertoire(&mut e_5);
     expected.push(e_5);
 
     // CASE 6, Fig.10 p(ABC^p|AB^c)
-    current_masks.push(0b011);
     past_masks.push(0b111);
+    current_masks.push(0b011);
     let mut e_6 = na::DVector::<f64>::from_vec(vec![0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0, 0.0]);
     normalize_repertoire(&mut e_6);
     expected.push(e_6);
 
 
     expected.iter().enumerate().for_each(|(i, e)| {
-        let actual = calc_cause_repertoire(current_masks[i], past_masks[i], current_state, &tpm);
+        let actual = calc_cause_repertoire(past_masks[i], current_masks[i], current_state, &tpm);
         assert_almost_equal_vec(&actual, e);
         notify_pass(i);
     });

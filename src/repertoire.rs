@@ -14,7 +14,7 @@ fn calc_unconstrained_cause(tpm: &na::DMatrix<f64>) -> na::DVector<f64> {
     na::DVector::<f64>::from_element(ndim, p)
 }
 
-fn calc_elementary_cause(current_mask: usize, past_mask: usize, current_state: usize, tpm: &na::DMatrix<f64>) -> na::DVector<f64> {
+fn calc_elementary_cause(past_mask: usize, current_mask: usize, current_state: usize, tpm: &na::DMatrix<f64>) -> na::DVector<f64> {
     let ndim = tpm.nrows();
 
     let column_indices = get_masked_counter((ndim - 1) & !current_mask , current_state & current_mask);
@@ -47,21 +47,21 @@ fn calc_elementary_cause(current_mask: usize, past_mask: usize, current_state: u
     result
 }
 
-pub fn calc_cause_repertoire(current_mask: usize, past_mask: usize, current_state: usize, tpm: &na::DMatrix<f64>) -> na::DVector<f64> {
-    let current_mask_size = current_mask.count_ones();
+pub fn calc_cause_repertoire(past_mask: usize, current_mask: usize, current_state: usize, tpm: &na::DMatrix<f64>) -> na::DVector<f64> {
     let past_mask_size = past_mask.count_ones();
+    let current_mask_size = current_mask.count_ones();
 
-   if current_mask_size == 0 || past_mask_size == 0 {
+   if past_mask_size == 0 || current_mask_size == 0 {
        calc_unconstrained_cause(tpm)
    } else {
        if current_mask_size == 1 {
-           calc_elementary_cause(current_mask, past_mask, current_state, tpm)
+           calc_elementary_cause(past_mask, current_mask, current_state, tpm)
        } else {
            let mut current_bases = generate_bases_from_mask(current_mask).into_iter();
-           let mut joint = calc_elementary_cause(current_bases.next().unwrap(), past_mask, current_state, tpm);
+           let mut joint = calc_elementary_cause(past_mask, current_bases.next().unwrap(), current_state, tpm);
 
            current_bases.for_each(|each_mask| {
-               let each = calc_elementary_cause(each_mask, past_mask, current_state, tpm);
+               let each = calc_elementary_cause(past_mask, each_mask, current_state, tpm);
                joint.component_mul_assign(&each);
            });
 
