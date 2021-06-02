@@ -17,7 +17,7 @@ fn assert_almost_equal_scalar(actual: f64, expected: f64) {
         message += &format!("actual -> {:?}\n", actual);
         message += &format!("expected -> {:?}\n", expected);
         message += &format!("diff -> {:?}\n", diff);
-        panic!(message);
+        panic!("{}", message);
     }
 }
 
@@ -30,7 +30,7 @@ fn assert_almost_equal_vec(actual: &na::DVector<f64>, expected: &na::DVector<f64
             message += &format!("actual -> {:?}\n", actual);
             message += &format!("expected -> {:?}\n", expected);
             message += &format!("diff -> {:?}\n", diff);
-            panic!(message);
+            panic!("{}", message);
         }
     });
 }
@@ -175,7 +175,7 @@ fn test_calc_cause_repertoire() {
         let c_past_bases = past_bases.generate_complement_bases();
         let current_bases =BitBases::construct_from_mask(current_masks[i], max_dim);
 
-        let mut marginal = calc_cause_repertoire(&past_bases, &current_bases, current_state, &tpm);
+        let marginal = calc_cause_repertoire(&past_bases, &current_bases, current_state, &tpm);
         let unconstrained = calc_cause_repertoire(&c_past_bases, &BitBases::null_bases(max_dim), current_state, &tpm);
 
         let actual  = marginal.component_mul(&unconstrained);

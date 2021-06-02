@@ -5,4 +5,6 @@ pub mod bitwise;
 pub mod emd;
 pub mod bases;
 pub mod repertoire;
+
+#[cfg(test)]
 pub mod tests;
