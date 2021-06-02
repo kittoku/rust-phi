@@ -1,6 +1,6 @@
 use std::usize;
 use nalgebra as na;
-use crate::{emd::calc_emd_for_mechanism, repertoire::{calc_cause_repertoire, normalize_repertoire}};
+use crate::{bases::BitBases, emd::calc_emd_for_mechanism, repertoire::{calc_cause_repertoire, normalize_repertoire}};
 
 
 const EPSILON : f64 = 1.0e-7;
@@ -102,54 +102,84 @@ fn test_calc_cause_repertoire() {
     past_masks.push(0b111);
     current_masks.push(0b001);
     let mut e_0 = na::DVector::<f64>::from_vec(vec![0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]);
-    normalize_repertoire(&mut e_0);
+    normalize_repertoire(&mut e_0, None);
     expected.push(e_0);
 
     // CASE 1, Fig.10 p(AB^p|C^c), ,
     past_masks.push(0b011);
     current_masks.push(0b100);
     let mut e_1 = na::DVector::<f64>::from_vec(vec![1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0]);
-    normalize_repertoire(&mut e_1);
+    normalize_repertoire(&mut e_1, None);
     expected.push(e_1);
 
     // CASE 2, Fig.10 p(AC^p|B^c)
     past_masks.push(0b101);
     current_masks.push(0b010);
     let mut e_2 = na::DVector::<f64>::from_vec(vec![1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 0.0]);
-    normalize_repertoire(&mut e_2);
+    normalize_repertoire(&mut e_2, None);
     expected.push(e_2);
 
     // CASE 3, Fig.10 p(BC^p|A^c)
     past_masks.push(0b110);
     current_masks.push(0b001);
     let mut e_3 = na::DVector::<f64>::from_vec(vec![0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]);
-    normalize_repertoire(&mut e_3);
+    normalize_repertoire(&mut e_3, None);
     expected.push(e_3);
 
     // CASE 4, Fig.10 p(ABC^p|ABC^c)
     past_masks.push(0b111);
     current_masks.push(0b111);
     let mut e_4 = na::DVector::<f64>::from_vec(vec![0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0]);
-    normalize_repertoire(&mut e_4);
+    normalize_repertoire(&mut e_4, None);
     expected.push(e_4);
 
     // CASE 5, Fig.10 p(AB^p|BC^c)
     past_masks.push(0b011);
     current_masks.push(0b110);
     let mut e_5 = na::DVector::<f64>::from_vec(vec![2.0, 0.0, 0.0, 1.0, 2.0, 0.0, 0.0, 1.0]);
-    normalize_repertoire(&mut e_5);
+    normalize_repertoire(&mut e_5, None);
     expected.push(e_5);
 
     // CASE 6, Fig.10 p(ABC^p|AB^c)
     past_masks.push(0b111);
     current_masks.push(0b011);
     let mut e_6 = na::DVector::<f64>::from_vec(vec![0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0, 0.0]);
-    normalize_repertoire(&mut e_6);
+    normalize_repertoire(&mut e_6, None);
     expected.push(e_6);
 
+    // CASE 7, p(ABC^p)
+    past_masks.push(0b111);
+    current_masks.push(0b000);
+    let mut e_7 = na::DVector::<f64>::from_vec(vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]);
+    normalize_repertoire(&mut e_7, None);
+    expected.push(e_7);
 
+    // CASE 8, p([])
+    past_masks.push(0b000);
+    current_masks.push(0b000);
+    let mut e_8 = na::DVector::<f64>::from_vec(vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]);
+    normalize_repertoire(&mut e_8, None);
+    expected.push(e_8);
+
+    // CASE 9, p([]|ABC^c)
+    past_masks.push(0b000);
+    current_masks.push(0b111);
+    let mut e_9 = na::DVector::<f64>::from_vec(vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]);
+    normalize_repertoire(&mut e_9, None);
+    expected.push(e_9);
+
+
+    let max_dim = (tpm.nrows() - 1).count_ones() as usize;
     expected.iter().enumerate().for_each(|(i, e)| {
-        let actual = calc_cause_repertoire(past_masks[i], current_masks[i], current_state, &tpm);
+        let past_bases = BitBases::construct_from_mask(past_masks[i], max_dim);
+        let c_past_bases = past_bases.generate_complement_bases();
+        let current_bases =BitBases::construct_from_mask(current_masks[i], max_dim);
+
+        let mut marginal = calc_cause_repertoire(&past_bases, &current_bases, current_state, &tpm);
+        let unconstrained = calc_cause_repertoire(&c_past_bases, &BitBases::null_bases(max_dim), current_state, &tpm);
+
+        let actual  = marginal.component_mul(&unconstrained);
+
         assert_almost_equal_vec(&actual, e);
         notify_pass(i);
     });

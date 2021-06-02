@@ -3,5 +3,6 @@ pub mod tpm;
 pub mod link_fn;
 pub mod bitwise;
 pub mod emd;
+pub mod bases;
 pub mod repertoire;
 pub mod tests;
