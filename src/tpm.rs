@@ -1,6 +1,6 @@
 use std::{sync::{Arc, Mutex}, thread::{self, JoinHandle}, usize};
 use nalgebra as na;
-use crate::{bitwise::{USIZE_BITS, change_bases, generate_bases_from_mask, get_masked_counter}, link_fn::LinkFn};
+use crate::{bases::BitBases, link_fn::LinkFn};
 
 
 struct RowCounter {
@@ -57,7 +57,7 @@ fn calc_joint_prob(state: usize, probs: &na::DMatrix<f64>) -> f64 {
     prob
 }
 
-pub fn calculate_tpm(fns: Vec<(LinkFn, usize)>, num_threads: usize) -> na::DMatrix<f64> {
+pub fn calc_tpm(fns: Vec<(LinkFn, usize)>, num_threads: usize) -> na::DMatrix<f64> {
     let element_size: usize = fns.len();
     let matrix_size: usize = 1 << element_size;
 
@@ -107,27 +107,26 @@ pub fn calculate_tpm(fns: Vec<(LinkFn, usize)>, num_threads: usize) -> na::DMatr
     Arc::try_unwrap(shared_tpm).unwrap().into_inner().unwrap()
 }
 
-pub fn margin_tpm(state: usize, mask: usize, matrix: &na::DMatrix<f64>) -> na::DMatrix<f64> {
-    let mask_size = mask.count_ones() as usize;
-    let margined_size = 1 << mask_size;
-    let fixed = state & !mask;
+pub fn marginalize_tpm(surviving_bases: &BitBases, state: usize, tpm: &na::DMatrix<f64>) -> na::DMatrix<f64> {
+    let c_bases = surviving_bases.generate_complement_bases();
 
-    let mut margined = na::DMatrix::<f64>::from_element(margined_size, margined_size, 0.0);
+    let maginal_dim = surviving_bases.image_size();
+    let mut marginal = na::DMatrix::<f64>::zeros(maginal_dim, maginal_dim);
 
-    let row_counter = get_masked_counter(mask, fixed);
-    let mask_bases = generate_bases_from_mask(mask);
-    let margined_bases = generate_bases_from_mask(usize::MAX >> USIZE_BITS - mask_size);
+    let fixed_state = c_bases.bases.iter().fold(0, |acc, &base| {
+        acc | (state & base)
+    });
 
+    surviving_bases.span(fixed_state).enumerate().for_each(|(marginal_row, original_row)| {
+        surviving_bases.span(0).enumerate().for_each(|(marginal_col, eq_class)| {
+            let mut marginal_vec = marginal.row_mut(marginal_row);
+            let original_vec = tpm.row(original_row);
 
-    row_counter.enumerate().for_each(|(margined_nrow, original_nrow)| {
-        let mut margined_row = margined.row_mut(margined_nrow);
-        let original_row = matrix.row(original_nrow);
-
-        (0..original_row.ncols()).for_each(|original_ncol| {
-            let eq_class = change_bases(original_ncol, &mask_bases, &margined_bases);
-            margined_row[eq_class] += original_row[original_ncol];
+            marginal_vec[marginal_col] = c_bases.span(eq_class).fold(0.0, |acc, original_col| {
+                acc + original_vec[original_col]
+            });
         });
     });
 
-    margined
+    marginal
 }
