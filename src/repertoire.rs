@@ -33,30 +33,30 @@ fn calc_elementary_cause(past_bases: &BitBases, current_bases: &BitBases, curren
 
     let c_past_bases = past_bases.generate_complement_bases();
 
-    let mut margined = na::DVector::<f64>::zeros(ndim);
+    let mut marginal = na::DVector::<f64>::zeros(ndim);
     past_bases.span(0).for_each(|eq_class| {
-        let mut margined_rows = Vec::<usize>::with_capacity(c_past_bases.image_size());
+        let mut marginal_rows = Vec::<usize>::with_capacity(c_past_bases.image_size());
 
         if c_past_bases.dim == 0 {
-            margined_rows.push(eq_class);
+            marginal_rows.push(eq_class);
         } else {
             c_past_bases.span(eq_class).for_each(|row| {
-                margined_rows.push(row);
+                marginal_rows.push(row);
             });
         }
 
-        let eq_prob = margined_rows.iter().fold(0.0, |acc, &row| {
+        let eq_prob = marginal_rows.iter().fold(0.0, |acc, &row| {
             acc + accumulated[row]
         });
 
-        margined_rows.iter().for_each(|&row| {
-            margined[row] = eq_prob;
+        marginal_rows.iter().for_each(|&row| {
+            marginal[row] = eq_prob;
         });
     });
 
 
-    normalize_repertoire(&mut margined, Some(c_past_bases.image_size() as f64));
-    margined
+    normalize_repertoire(&mut marginal, Some(c_past_bases.image_size() as f64));
+    marginal
 }
 
 pub fn calc_cause_repertoire(past_bases: &BitBases, current_bases: &BitBases, current_state: usize, tpm: &na::DMatrix<f64>) -> na::DVector<f64> {
