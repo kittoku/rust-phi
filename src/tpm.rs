@@ -113,11 +113,7 @@ pub fn marginalize_tpm(surviving_bases: &BitBases, state: usize, tpm: &na::DMatr
     let maginal_dim = surviving_bases.image_size();
     let mut marginal = na::DMatrix::<f64>::zeros(maginal_dim, maginal_dim);
 
-    let fixed_state = c_bases.bases.iter().fold(0, |acc, &base| {
-        acc | (state & base)
-    });
-
-    surviving_bases.span(fixed_state).enumerate().for_each(|(marginal_row, original_row)| {
+    surviving_bases.span(c_bases.fixed_state(state)).enumerate().for_each(|(marginal_row, original_row)| {
         surviving_bases.span(0).enumerate().for_each(|(marginal_col, eq_class)| {
             let mut marginal_vec = marginal.row_mut(marginal_row);
             let original_vec = tpm.row(original_row);

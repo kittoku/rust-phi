@@ -93,6 +93,12 @@ impl BitBases {
         1 << self.codim
     }
 
+    pub fn fixed_state(&self, state: usize) -> usize {
+        self.bases.iter().fold(0, |acc, &base| {
+            acc | (state & base)
+        })
+    }
+
     pub fn span(&self, initial: usize) -> CombinationIterator {
         CombinationIterator {
             initial: initial,
