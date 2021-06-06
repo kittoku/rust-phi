@@ -27,4 +27,20 @@ fn main() {
     let surviving_bases = rust_phi::bases::BitBases::construct_from_mask(mask, 6);
     let marginal = rust_phi::tpm::marginalize_tpm(&surviving_bases, state, &tpm);
     println!("TPM of ABC: {}", marginal); // == Figure 1 (B)
+
+    // get all parts used in mechanism partition
+    let cause_parts = rust_phi::mechanism::generate_all_repertoire_parts(rust_phi::mechanism::RepertoireType::CAUSE, state, &marginal);
+    let effect_parts = rust_phi::mechanism::generate_all_repertoire_parts(rust_phi::mechanism::RepertoireType::EFFECT, state, &marginal);
+
+    // search concept
+    let mechanism_ab = rust_phi::bases::BitBases::construct_from_mask(0b011, 3);
+    let concept_ab = rust_phi::mechanism::search_concept_with_parts(&mechanism_ab, &cause_parts, &effect_parts).unwrap();
+    println!("MICE of AB:");
+    println!("CAUSE -> {}", concept_ab.core_cause.repertoire);
+    println!("EFFECT -> {}", concept_ab.core_effect.repertoire);
+    println!("phi -> {}", concept_ab.core_cause.phi.min(concept_ab.core_effect.phi));
+
+    let mechanism_ac = rust_phi::bases::BitBases::construct_from_mask(0b101, 3);
+    let concept_ac = rust_phi::mechanism::search_concept_with_parts(&mechanism_ac, &cause_parts, &effect_parts);
+    println!("Concept of AB: {:?}", concept_ac) // None because AC is fully reduced
 }
