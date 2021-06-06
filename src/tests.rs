@@ -1,6 +1,6 @@
 use std::usize;
 use nalgebra as na;
-use crate::{bases::BitBases, emd::calc_emd_for_mechanism, repertoire::{calc_cause_repertoire, calc_effect_repertoire, normalize_repertoire}};
+use crate::{bases::BitBases, emd::calc_emd_for_mechanism, mechanism::{generate_all_repertoire_parts, search_concept_with_parts}, repertoire::{calc_cause_repertoire, calc_effect_repertoire, normalize_repertoire}};
 
 
 const EPSILON : f64 = 1.0e-7;
@@ -265,6 +265,60 @@ fn test_calc_effect_repertoire() {
         let actual  = marginal.component_mul(&unconstrained);
 
         assert_almost_equal_vec(&actual, e);
+        notify_pass(i);
+    });
+}
+
+#[test]
+fn test_search_concept_with_parts() {
+    let tpm = generate_reference_tpm();
+    let current_state = generate_reference_state();
+
+    let cause_parts = generate_all_repertoire_parts(crate::mechanism::RepertoireType::CAUSE, current_state, &tpm);
+    let effect_parts = generate_all_repertoire_parts(crate::mechanism::RepertoireType::EFFECT, current_state, &tpm);
+
+    let mut mechanisms = Vec::<usize>::new();
+    let mut expected = Vec::<f64>::new();
+
+    // CASE 0, Fig.10 ABC
+    mechanisms.push(0b111);
+    expected.push(0.5);
+
+    // CASE 1, Fig.10 BC
+    mechanisms.push(0b110);
+    expected.push(0.3333333333);
+
+    // CASE 2, Fig.10 AB
+    mechanisms.push(0b011);
+    expected.push(0.25);
+
+    // CASE 3, Fig.10 C
+    mechanisms.push(0b100);
+    expected.push(0.25);
+
+    // CASE 4, Fig.10 B
+    mechanisms.push(0b010);
+    expected.push(0.1666666666);
+
+    // CASE 5, Fig.10 A
+    mechanisms.push(0b001);
+    expected.push(0.1666666666);
+
+    // CASE 6, Fig.10 AC (to be fully reduced)
+    mechanisms.push(0b101);
+    expected.push(0.0);
+
+
+    (0..mechanisms.len()).for_each(|i| {
+        let mechanism = BitBases::construct_from_mask(mechanisms[i], 3);
+        let concept = search_concept_with_parts(&mechanism, &cause_parts, &effect_parts);
+        let actual = if let Some(v) = concept {
+            v.core_cause.phi.min(v.core_effect.phi)
+        } else {
+            0.0
+        };
+
+        assert_almost_equal_scalar(actual, expected[i]);
         notify_pass(i);
     });
 }

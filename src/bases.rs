@@ -39,6 +39,7 @@ impl <'a> Iterator for CombinationIterator<'a> {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct BitBases {
     pub dim: usize,
     pub codim: usize,
@@ -85,12 +86,20 @@ impl BitBases {
         }
     }
 
+    pub fn to_mask(&self) -> usize {
+        self.bases.iter().fold(0, |acc, &x| acc | x)
+    }
+
     pub fn image_size(&self) -> usize {
         1 << self.dim
     }
 
     pub fn codim_image_size(&self) -> usize {
         1 << self.codim
+    }
+
+    pub fn max_image_size(&self) -> usize {
+        1 << self.max_dim
     }
 
     pub fn fixed_state(&self, state: usize) -> usize {
