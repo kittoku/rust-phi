@@ -1,11 +1,11 @@
-use crate::bitwise::{USIZE_BASES, generate_bases_from_mask};
+use crate::bitwise::{USIZE_BASIS, generate_vectors_from_mask};
 
 
 pub struct CombinationIterator<'a> {
     initial: usize,
     current: usize,
     index: Vec<usize>,
-    parent: &'a BitBases,
+    parent: &'a BitBasis,
 }
 
 impl <'a> Iterator for CombinationIterator<'a> {
@@ -17,7 +17,7 @@ impl <'a> Iterator for CombinationIterator<'a> {
         }
 
         (0..self.parent.dim).for_each(|i| {
-             self.index[i] = if self.current & USIZE_BASES[i] == 0 {
+             self.index[i] = if self.current & USIZE_BASIS[i] == 0 {
                 0
             } else {
                 1
@@ -29,7 +29,7 @@ impl <'a> Iterator for CombinationIterator<'a> {
 
         let mut union = self.initial;
 
-        self.index.iter().zip(&self.parent.bases).for_each(|(&i, &b)|{
+        self.index.iter().zip(&self.parent.vectors).for_each(|(&i, &b)|{
             if i != 0 {
                 union |= b;
             }
@@ -40,54 +40,54 @@ impl <'a> Iterator for CombinationIterator<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct BitBases {
+pub struct BitBasis {
     pub dim: usize,
     pub codim: usize,
     pub max_dim: usize,
     pub unused_mask: usize,
-    pub bases: Vec<usize>,
+    pub vectors: Vec<usize>,
 }
 
-impl BitBases {
-    pub fn construct_from_bases(bases: &[usize], max_dim: usize) -> BitBases {
-        let bases_dim = bases.len();
-        let mut cloned_bases = Vec::<usize>::with_capacity(bases_dim);
-        bases.iter().for_each(|&x| cloned_bases.push(x));
+impl BitBasis {
+    pub fn construct_from_vectors(vectors: &[usize], max_dim: usize) -> BitBasis {
+        let basis_dim = vectors.len();
+        let mut cloned_vectors = Vec::<usize>::with_capacity(basis_dim);
+        vectors.iter().for_each(|&x| cloned_vectors.push(x));
 
-        BitBases {
-            dim: bases_dim,
-            codim: max_dim - bases_dim,
+        BitBasis {
+            dim: basis_dim,
+            codim: max_dim - basis_dim,
             max_dim: max_dim,
-            unused_mask: usize::MAX << bases_dim,
-            bases: cloned_bases,
+            unused_mask: usize::MAX << basis_dim,
+            vectors: cloned_vectors,
         }
     }
 
-    pub fn construct_from_mask(mask: usize, max_dim: usize) -> BitBases {
-        BitBases::construct_from_bases(&generate_bases_from_mask(mask), max_dim)
+    pub fn construct_from_mask(mask: usize, max_dim: usize) -> BitBasis {
+        BitBasis::construct_from_vectors(&generate_vectors_from_mask(mask), max_dim)
     }
 
-    pub fn generate_complement_bases(&self) -> BitBases {
-        let union = self.bases.iter().fold(0, |acc, &base| acc | base );
+    pub fn generate_complement_basis(&self) -> BitBasis {
+        let union = self.vectors.iter().fold(0, |acc, &vector| acc | vector );
         let mut complement = Vec::<usize>::with_capacity(self.codim);
 
-        USIZE_BASES[0..self.max_dim].iter().for_each(|&base| {
-            if union & base == 0 {
-                complement.push(base);
+        USIZE_BASIS[0..self.max_dim].iter().for_each(|&vector| {
+            if union & vector == 0 {
+                complement.push(vector);
             }
         });
 
-        BitBases {
+        BitBasis {
             dim: self.codim,
             codim: self.dim,
             max_dim: self.max_dim,
             unused_mask: usize::MAX << self.codim,
-            bases: complement,
+            vectors: complement,
         }
     }
 
     pub fn to_mask(&self) -> usize {
-        self.bases.iter().fold(0, |acc, &x| acc | x)
+        self.vectors.iter().fold(0, |acc, &x| acc | x)
     }
 
     pub fn image_size(&self) -> usize {
@@ -103,8 +103,8 @@ impl BitBases {
     }
 
     pub fn fixed_state(&self, state: usize) -> usize {
-        self.bases.iter().fold(0, |acc, &base| {
-            acc | (state & base)
+        self.vectors.iter().fold(0, |acc, &vector| {
+            acc | (state & vector)
         })
     }
 
@@ -117,30 +117,30 @@ impl BitBases {
         }
     }
 
-    pub fn null_bases(max_dim: usize) -> BitBases {
-        BitBases {
+    pub fn null_basis(max_dim: usize) -> BitBasis {
+        BitBasis {
             dim: 0,
             codim: max_dim,
             max_dim: max_dim,
             unused_mask: usize::MAX,
-            bases: vec![],
+            vectors: vec![],
         }
     }
 
-    pub fn sub_bases(&self, index: &[usize]) -> BitBases {
+    pub fn sub_basis(&self, index: &[usize]) -> BitBasis {
         let dim = index.len();
 
-        let mut bases = Vec::<usize>::with_capacity(dim);
+        let mut vectors = Vec::<usize>::with_capacity(dim);
         index.iter().for_each(|&i| {
-            bases.push(self.bases[i]);
+            vectors.push(self.vectors[i]);
         });
 
-        BitBases {
+        BitBasis {
             dim: dim,
             codim: self.max_dim - dim,
             max_dim: self.max_dim,
             unused_mask: usize::MAX << dim,
-            bases: bases,
+            vectors: vectors,
         }
     }
 }

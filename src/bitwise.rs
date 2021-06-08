@@ -2,7 +2,7 @@ use std::{mem::size_of, usize};
 
 
 pub const USIZE_BITS: usize = size_of::<usize>() * 8;
-pub const USIZE_BASES: [usize; 64] = [
+pub const USIZE_BASIS: [usize; 64] = [
     1 << 0, 1 << 1, 1 << 2, 1 << 3, 1 << 4, 1 << 5, 1 << 6, 1 << 7, 1 << 8, 1 << 9,
     1 << 10, 1 << 11, 1 << 12, 1 << 13, 1 << 14, 1 << 15, 1 << 16, 1 << 17, 1 << 18, 1 << 19,
     1 << 20, 1 << 21, 1 << 22, 1 << 23, 1 << 24, 1 << 25, 1 << 26, 1 << 27, 1 << 28, 1 << 29,
@@ -36,11 +36,11 @@ pub fn generate_indices(mask: usize) -> Vec<usize> {
     indices
 }
 
-pub fn generate_bases_from_indices(indices: &Vec<usize>) -> Vec<usize> {
-    indices.iter().map(|i| USIZE_BASES[*i]).collect()
+pub fn generate_vectors_from_indices(indices: &Vec<usize>) -> Vec<usize> {
+    indices.iter().map(|i| USIZE_BASIS[*i]).collect()
 }
 
-pub fn generate_bases_from_mask(mask: usize) -> Vec<usize> {
+pub fn generate_vectors_from_mask(mask: usize) -> Vec<usize> {
     let indices = generate_indices(mask);
-    generate_bases_from_indices(&indices)
+    generate_vectors_from_indices(&indices)
 }

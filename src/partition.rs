@@ -1,4 +1,4 @@
-use crate::bitwise::USIZE_BASES;
+use crate::bitwise::USIZE_BASIS;
 
 
 #[derive(Debug)]
@@ -46,7 +46,7 @@ impl Iterator for MechanismPartitionIterator {
         let mut right_mechanism = Vec::<usize>::new();
 
         (0..self.mechanism_size).for_each(|i| {
-            if self.current & USIZE_BASES[i] == 0 {
+            if self.current & USIZE_BASIS[i] == 0 {
                 left_mechanism.push(i);
             } else {
                 right_mechanism.push(i);
@@ -54,7 +54,7 @@ impl Iterator for MechanismPartitionIterator {
         });
 
         (0..self.purview_size).zip(self.mechanism_size..self.mask_size).for_each(|(i, j)| {
-            if self.current & USIZE_BASES[j] == 0 {
+            if self.current & USIZE_BASIS[j] == 0 {
                 left_purview.push(i);
             } else {
                 right_purview.push(i);

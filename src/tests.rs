@@ -1,6 +1,6 @@
 use std::usize;
 use nalgebra as na;
-use crate::{bases::BitBases, emd::calc_emd_for_mechanism, mechanism::{generate_all_repertoire_parts, search_concept_with_parts}, repertoire::{calc_cause_repertoire, calc_effect_repertoire, normalize_repertoire}};
+use crate::{basis::BitBasis, emd::calc_emd_for_mechanism, mechanism::{generate_all_repertoire_parts, search_concept_with_parts}, repertoire::{calc_cause_repertoire, calc_effect_repertoire, normalize_repertoire}};
 
 
 const EPSILON : f64 = 1.0e-7;
@@ -171,12 +171,12 @@ fn test_calc_cause_repertoire() {
 
     let max_dim = (tpm.nrows() - 1).count_ones() as usize;
     expected.iter().enumerate().for_each(|(i, e)| {
-        let purview = BitBases::construct_from_mask(purview_masks[i], max_dim);
-        let c_purview = purview.generate_complement_bases();
-        let mechanism =BitBases::construct_from_mask(mechanism_masks[i], max_dim);
+        let purview = BitBasis::construct_from_mask(purview_masks[i], max_dim);
+        let c_purview = purview.generate_complement_basis();
+        let mechanism =BitBasis::construct_from_mask(mechanism_masks[i], max_dim);
 
         let marginal = calc_cause_repertoire(&purview, &mechanism, current_state, &tpm);
-        let unconstrained = calc_cause_repertoire(&c_purview, &BitBases::null_bases(max_dim), current_state, &tpm);
+        let unconstrained = calc_cause_repertoire(&c_purview, &BitBasis::null_basis(max_dim), current_state, &tpm);
 
         let actual  = marginal.component_mul(&unconstrained);
 
@@ -255,12 +255,12 @@ fn test_calc_effect_repertoire() {
 
     let max_dim = (tpm.nrows() - 1).count_ones() as usize;
     expected.iter().enumerate().for_each(|(i, e)| {
-        let purview = BitBases::construct_from_mask(purview_masks[i], max_dim);
-        let c_purview = purview.generate_complement_bases();
-        let mechanism =BitBases::construct_from_mask(mechanism_masks[i], max_dim);
+        let purview = BitBasis::construct_from_mask(purview_masks[i], max_dim);
+        let c_purview = purview.generate_complement_basis();
+        let mechanism =BitBasis::construct_from_mask(mechanism_masks[i], max_dim);
 
         let marginal = calc_effect_repertoire(&purview, &mechanism, current_state, &tpm);
-        let unconstrained = calc_effect_repertoire(&c_purview, &BitBases::null_bases(max_dim), current_state, &tpm);
+        let unconstrained = calc_effect_repertoire(&c_purview, &BitBasis::null_basis(max_dim), current_state, &tpm);
 
         let actual  = marginal.component_mul(&unconstrained);
 
@@ -310,7 +310,7 @@ fn test_search_concept_with_parts() {
 
 
     (0..mechanisms.len()).for_each(|i| {
-        let mechanism = BitBases::construct_from_mask(mechanisms[i], 3);
+        let mechanism = BitBasis::construct_from_mask(mechanisms[i], 3);
         let concept = search_concept_with_parts(&mechanism, &cause_parts, &effect_parts);
         let actual = if let Some(v) = concept {
             v.core_cause.phi.min(v.core_effect.phi)

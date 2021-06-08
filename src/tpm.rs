@@ -1,6 +1,6 @@
 use std::{sync::{Arc, Mutex}, thread::{self, JoinHandle}, usize};
 use nalgebra as na;
-use crate::{bases::BitBases, link_fn::LinkFn};
+use crate::{basis::BitBasis, link_fn::LinkFn};
 
 
 struct RowCounter {
@@ -107,18 +107,18 @@ pub fn calc_tpm(fns: Vec<(LinkFn, usize)>, num_threads: usize) -> na::DMatrix<f6
     Arc::try_unwrap(shared_tpm).unwrap().into_inner().unwrap()
 }
 
-pub fn marginalize_tpm(surviving_bases: &BitBases, state: usize, tpm: &na::DMatrix<f64>) -> na::DMatrix<f64> {
-    let c_bases = surviving_bases.generate_complement_bases();
+pub fn marginalize_tpm(surviving_basis: &BitBasis, state: usize, tpm: &na::DMatrix<f64>) -> na::DMatrix<f64> {
+    let c_basis = surviving_basis.generate_complement_basis();
 
-    let maginal_dim = surviving_bases.image_size();
+    let maginal_dim = surviving_basis.image_size();
     let mut marginal = na::DMatrix::<f64>::zeros(maginal_dim, maginal_dim);
 
-    surviving_bases.span(c_bases.fixed_state(state)).enumerate().for_each(|(marginal_row, original_row)| {
-        surviving_bases.span(0).enumerate().for_each(|(marginal_col, eq_class)| {
+    surviving_basis.span(c_basis.fixed_state(state)).enumerate().for_each(|(marginal_row, original_row)| {
+        surviving_basis.span(0).enumerate().for_each(|(marginal_col, eq_class)| {
             let mut marginal_vec = marginal.row_mut(marginal_row);
             let original_vec = tpm.row(original_row);
 
-            marginal_vec[marginal_col] = c_bases.span(eq_class).fold(0.0, |acc, original_col| {
+            marginal_vec[marginal_col] = c_basis.span(eq_class).fold(0.0, |acc, original_col| {
                 acc + original_vec[original_col]
             });
         });

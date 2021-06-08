@@ -1,5 +1,5 @@
 use nalgebra as na;
-use crate::{bases::BitBases, emd::calc_emd_for_mechanism, partition::MechanismPartitionIterator, repertoire::{calc_cause_repertoire, calc_effect_repertoire}};
+use crate::{basis::BitBasis, emd::calc_emd_for_mechanism, partition::MechanismPartitionIterator, repertoire::{calc_cause_repertoire, calc_effect_repertoire}};
 
 
 pub enum RepertoireType {
@@ -21,8 +21,8 @@ pub fn generate_all_repertoire_parts(repertoire_type: RepertoireType, current_st
     let max_dim = (ndim - 1).count_ones() as usize;
     (0..ndim).for_each(|p| {
         (0..ndim).for_each(|m| {
-            let purview = BitBases::construct_from_mask(p, max_dim);
-            let mechanism = BitBases::construct_from_mask(m, max_dim);
+            let purview = BitBasis::construct_from_mask(p, max_dim);
+            let mechanism = BitBasis::construct_from_mask(m, max_dim);
 
             let repertoire = calc_repertoire(&purview, &mechanism, current_state, tpm);
 
@@ -35,7 +35,7 @@ pub fn generate_all_repertoire_parts(repertoire_type: RepertoireType, current_st
 
 #[derive(Debug)]
 pub struct CoreRepertoire {
-    pub purview: BitBases,
+    pub purview: BitBasis,
     pub repertoire: na::DVector<f64>,
     pub phi: f64,
 }
@@ -44,19 +44,19 @@ pub fn construct_vector_from_row(row: usize, matrix: &na::DMatrix<f64>) -> na::D
     na::DVector::<f64>::from_iterator(matrix.ncols(), matrix.row(row).iter().map(|x| *x))
 }
 
-pub fn search_core_with_parts(mechanism: &BitBases, parts: &na::DMatrix<f64>) -> Option<CoreRepertoire> {
+pub fn search_core_with_parts(mechanism: &BitBasis, parts: &na::DMatrix<f64>) -> Option<CoreRepertoire> {
     let mechanism_mask = mechanism.to_mask();
 
     let mut max_phi_repertoire: Option<CoreRepertoire> = None;
 
     for purview_mask in 0..mechanism.max_image_size() {
-        let candidate = BitBases::construct_from_mask(purview_mask, mechanism.max_dim);
+        let candidate = BitBasis::construct_from_mask(purview_mask, mechanism.max_dim);
         if candidate.dim + mechanism.dim == 1 {
             // No possible partition
             continue;
         }
 
-        let c_candidate = candidate.generate_complement_bases();
+        let c_candidate = candidate.generate_complement_basis();
 
         let unconstrained_row = c_candidate.to_mask() << mechanism.max_dim;
         let unconstrained = construct_vector_from_row(unconstrained_row, parts);
@@ -69,10 +69,10 @@ pub fn search_core_with_parts(mechanism: &BitBases, parts: &na::DMatrix<f64>) ->
 
         let partitions = MechanismPartitionIterator::construct(candidate.dim, mechanism.dim);
         for partition in partitions {
-            let left_purview_mask = candidate.sub_bases(&partition.left_purview).to_mask() << mechanism.max_dim;
-            let right_purview_mask = candidate.sub_bases(&partition.right_purview).to_mask() << mechanism.max_dim;
-            let left_mechanism_mask = mechanism.sub_bases(&partition.left_mechanism).to_mask();
-            let right_mechanism_mask = mechanism.sub_bases(&partition.right_mechanism).to_mask();
+            let left_purview_mask = candidate.sub_basis(&partition.left_purview).to_mask() << mechanism.max_dim;
+            let right_purview_mask = candidate.sub_basis(&partition.right_purview).to_mask() << mechanism.max_dim;
+            let left_mechanism_mask = mechanism.sub_basis(&partition.left_mechanism).to_mask();
+            let right_mechanism_mask = mechanism.sub_basis(&partition.right_mechanism).to_mask();
 
             let mut joint = unconstrained.clone();
             joint.component_mul_assign(&construct_vector_from_row(left_purview_mask | left_mechanism_mask, parts));
@@ -115,12 +115,12 @@ pub fn search_core_with_parts(mechanism: &BitBases, parts: &na::DMatrix<f64>) ->
 
 #[derive(Debug)]
 pub struct Concept {
-    pub mechanism: BitBases,
+    pub mechanism: BitBasis,
     pub core_cause: CoreRepertoire,
     pub core_effect: CoreRepertoire,
 }
 
-pub fn search_concept_with_parts(mechanism: &BitBases, cause_parts: &na::DMatrix<f64>, effect_parts: &na::DMatrix<f64>) -> Option<Concept> {
+pub fn search_concept_with_parts(mechanism: &BitBasis, cause_parts: &na::DMatrix<f64>, effect_parts: &na::DMatrix<f64>) -> Option<Concept> {
     let core_cause = if let Some(v) = search_core_with_parts(mechanism, cause_parts) {
         v
     } else {
