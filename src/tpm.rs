@@ -1,6 +1,6 @@
 use std::{sync::{Arc, Mutex}, thread::{self, JoinHandle}, usize};
 use nalgebra as na;
-use crate::{basis::BitBasis, link_fn::LinkFn};
+use crate::{basis::BitBasis, link_fn::LinkFn, partition::SystemPartition};
 
 
 struct RowCounter {
@@ -107,7 +107,7 @@ pub fn calc_tpm(fns: Vec<(LinkFn, usize)>, num_threads: usize) -> na::DMatrix<f6
     Arc::try_unwrap(shared_tpm).unwrap().into_inner().unwrap()
 }
 
-pub fn marginalize_tpm(surviving_basis: &BitBasis, state: usize, tpm: &na::DMatrix<f64>) -> na::DMatrix<f64> {
+pub fn calc_fixed_marginal_tpm(surviving_basis: &BitBasis, state: usize, tpm: &na::DMatrix<f64>) -> na::DMatrix<f64> {
     let c_basis = surviving_basis.generate_complement_basis();
 
     let maginal_dim = surviving_basis.image_size();
@@ -122,6 +122,73 @@ pub fn marginalize_tpm(surviving_basis: &BitBasis, state: usize, tpm: &na::DMatr
                 acc + original_vec[original_col]
             });
         });
+    });
+
+    marginal
+}
+
+pub fn calc_elementary_marginal_tpm(target_basis: &BitBasis, surviving_basis: &BitBasis, tpm: &na::DMatrix<f64>) -> na::DMatrix<f64> {
+    let target_vector = target_basis.vectors[0];
+    let c_target_basis = target_basis.generate_complement_basis();
+    let c_surviving_basis = surviving_basis.generate_complement_basis();
+
+    let marginal_dim = tpm.nrows();
+    let mut marginal = na::DMatrix::<f64>::zeros(marginal_dim, marginal_dim);
+
+    let mut acc = na::DVector::<f64>::zeros(marginal_dim).transpose();
+
+    surviving_basis.span(0).for_each(|eq_class| {
+        acc.fill(0.0);
+
+        c_surviving_basis.span(eq_class).for_each(|row| {
+            acc += tpm.row(row);
+        });
+
+        let mut p_0 = c_target_basis.span(0).fold(0.0, |p, col| {
+            p + acc[col]
+        });
+
+        let mut p_1 = c_target_basis.span(target_vector).fold(0.0, |p, col| {
+            p + acc[col]
+        });
+
+        let norm_term = 1.0 / (p_0 + p_1);
+
+        p_0 *= norm_term;
+        p_1 *= norm_term;
+
+
+        surviving_basis.span(0).for_each(|_eq_class| {
+            c_surviving_basis.span(eq_class).for_each(|_row| {
+                let mut marginal_row = marginal.row_mut(_row);
+
+                c_target_basis.span(0).for_each(|col| {
+                    marginal_row[col] = p_0;
+                });
+
+                c_target_basis.span(target_vector).for_each(|col| {
+                    marginal_row[col] = p_1;
+                });
+            });
+        });
+    });
+
+    marginal
+}
+
+pub fn calc_partitioned_marginal_tpm(partition: &SystemPartition, system_basis: &BitBasis, tpm: &na::DMatrix<f64>) -> na::DMatrix<f64> {
+    let template_basis = system_basis.sub_basis(&[partition.cut_from[0]]);
+    let mut marginal = calc_elementary_marginal_tpm(&template_basis, system_basis, tpm);
+
+    (1..partition.cut_from.len()).for_each(|i| {
+        let intact_basis = system_basis.sub_basis(&[partition.cut_from[i]]);
+        marginal.component_mul_assign(&calc_elementary_marginal_tpm(&intact_basis, system_basis, tpm));
+    });
+
+    let isolated_basis = system_basis.sub_basis(&partition.cut_to);
+    (0..partition.cut_to.len()).for_each(|i| {
+        let noised_basis = system_basis.sub_basis(&[partition.cut_to[i]]);
+        marginal.component_mul_assign(&calc_elementary_marginal_tpm(&noised_basis, &isolated_basis, tpm))
     });
 
     marginal

@@ -71,3 +71,54 @@ impl Iterator for MechanismPartitionIterator {
         })
     }
 }
+
+#[derive(Debug)]
+pub struct SystemPartition {
+    pub cut_from: Vec<usize>,
+    pub cut_to: Vec<usize>,
+}
+pub struct SystemPartitionIterator {
+    current: usize,
+    mask_size: usize,
+    stop: usize,
+}
+
+impl SystemPartitionIterator {
+    pub fn construct(system_size: usize) -> SystemPartitionIterator {
+        let stop = !(usize::MAX << system_size);
+
+        SystemPartitionIterator {
+            current: 1,
+            mask_size: system_size,
+            stop: stop,
+        }
+    }
+}
+
+impl Iterator for SystemPartitionIterator {
+    type Item = SystemPartition;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.current >= self.stop {
+            return None
+        }
+
+        let mut cut_from = Vec::<usize>::new();
+        let mut cut_to = Vec::<usize>::new();
+
+        (0..self.mask_size).for_each(|i| {
+            if self.current & USIZE_BASIS[i] == 0 {
+                cut_from.push(i);
+            } else {
+                cut_to.push(i);
+            }
+        });
+
+        self.current += 1;
+
+        Some(SystemPartition {
+            cut_from: cut_from,
+            cut_to: cut_to,
+        })
+    }
+}

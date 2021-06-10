@@ -1,6 +1,6 @@
 use std::usize;
 use nalgebra as na;
-use crate::{basis::BitBasis, emd::calc_emd_for_mechanism, mechanism::{generate_all_repertoire_parts, search_concept_with_parts}, repertoire::{calc_cause_repertoire, calc_effect_repertoire, normalize_repertoire}};
+use crate::{basis::BitBasis, emd::calc_emd_for_mechanism, mechanism::{generate_all_repertoire_parts, search_concept_with_parts}, partition::SystemPartition, repertoire::{calc_cause_repertoire, calc_effect_repertoire, normalize_repertoire}, tpm::calc_partitioned_marginal_tpm};
 
 
 const EPSILON : f64 = 1.0e-7;
@@ -27,6 +27,20 @@ fn assert_almost_equal_vec(actual: &na::DVector<f64>, expected: &na::DVector<f64
     diff.iter().for_each(|&x| {
         if x > EPSILON {
             let mut message = String::from("The given vectors are too different: \n");
+            message += &format!("actual -> {:?}\n", actual);
+            message += &format!("expected -> {:?}\n", expected);
+            message += &format!("diff -> {:?}\n", diff);
+            panic!("{}", message);
+        }
+    });
+}
+
+fn assert_almost_equal_matrix(actual: &na::DMatrix<f64>, expected: &na::DMatrix<f64>) {
+    let diff = (actual - expected).abs();
+
+    diff.iter().for_each(|&x| {
+        if x > EPSILON {
+            let mut message = String::from("The given matrices are too different: \n");
             message += &format!("actual -> {:?}\n", actual);
             message += &format!("expected -> {:?}\n", expected);
             message += &format!("diff -> {:?}\n", diff);
@@ -321,4 +335,30 @@ fn test_search_concept_with_parts() {
         assert_almost_equal_scalar(actual, expected[i]);
         notify_pass(i);
     });
+}
+
+#[test]
+fn test_calc_partitioned_marginal_tpm() {
+    let tpm = generate_reference_tpm();
+
+    let system_basis = BitBasis::construct_from_mask(0b111, 3);
+    let partition = SystemPartition {
+        cut_from: vec![0],
+        cut_to: vec![1, 2],
+    };
+
+    let actual = calc_partitioned_marginal_tpm(&partition, &system_basis, &tpm);
+
+    let expected = na::DMatrix::<f64>::from_row_slice(8, 8, &[
+        0.5, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0,
+        0.5, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0,
+        0.0, 0.5, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0,
+        0.0, 0.5, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0,
+        0.0, 0.25, 0.0, 0.25, 0.0, 0.25, 0.0, 0.25,
+        0.0, 0.25, 0.0, 0.25, 0.0, 0.25, 0.0, 0.25,
+        0.0, 0.25, 0.0, 0.25, 0.0, 0.25, 0.0, 0.25,
+        0.0, 0.25, 0.0, 0.25, 0.0, 0.25, 0.0, 0.25,
+    ]);
+
+    assert_almost_equal_matrix(&actual, &expected);
 }

@@ -25,7 +25,7 @@ fn main() {
 
     // calculate marginal distribution for ABC
     let surviving_basis = rust_phi::basis::BitBasis::construct_from_mask(mask, 6);
-    let marginal = rust_phi::tpm::marginalize_tpm(&surviving_basis, state, &tpm);
+    let marginal = rust_phi::tpm::calc_fixed_marginal_tpm(&surviving_basis, state, &tpm);
     println!("TPM of ABC: {}", marginal); // == Figure 1 (B)
 
     // get all parts used in mechanism partition
