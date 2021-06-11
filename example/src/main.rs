@@ -55,10 +55,10 @@ fn main() {
     let partitioned_cause_parts =  rust_phi::mechanism::generate_all_repertoire_parts(rust_phi::mechanism::RepertoireType::CAUSE, state, &partitioned_tpm);
     let partitioned_effect_parts =  rust_phi::mechanism::generate_all_repertoire_parts(rust_phi::mechanism::RepertoireType::EFFECT, state, &partitioned_tpm);
 
-    // calculate a big phi
+    // calculate extended EMD
     let constellation =  rust_phi::mechanism::search_constellation_with_parts(&system_basis, &cause_parts, &effect_parts);
     let partitioned_constellation =  rust_phi::mechanism::search_constellation_with_parts(&system_basis, &partitioned_cause_parts, &partitioned_effect_parts);
 
-    let big_phi =  rust_phi::emd::calc_constellation_emd(&constellation, &partitioned_constellation);
-    println!("Big phi: {}", big_phi);
+    let extended_emd =  rust_phi::emd::calc_constellation_emd(&constellation, &partitioned_constellation);
+    println!("Distance between constellations: {}", extended_emd);
 }

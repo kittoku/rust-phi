@@ -386,7 +386,7 @@ fn test_calc_constellation_emd() {
     let intact = search_constellation_with_parts(&system_basis, &intact_cause_parts, &intact_effect_parts);
     let partitioned = search_constellation_with_parts(&system_basis, &partitioned_cause_parts, &partitioned_effect_parts);
 
-    let big_phi = calc_constellation_emd(&intact, &partitioned);
+    let extended_emd = calc_constellation_emd(&intact, &partitioned);
 
-    assert_almost_equal_scalar(big_phi, 1.9166666666);
+    assert_almost_equal_scalar(extended_emd, 1.9166666666);
 }
