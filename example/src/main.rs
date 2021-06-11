@@ -13,7 +13,7 @@ fn main() {
     // parse link.sif
     let infos = rust_phi::sif::read_sif(&link_path);
 
-    // generate each functions of elementes
+    // generate each functions of elements
     let fns = rust_phi::link_fn::get_link_fns(infos);
 
     // calculate a transition probability matrix of the whole system
@@ -32,7 +32,7 @@ fn main() {
     let cause_parts = rust_phi::mechanism::generate_all_repertoire_parts(rust_phi::mechanism::RepertoireType::CAUSE, state, &marginal);
     let effect_parts = rust_phi::mechanism::generate_all_repertoire_parts(rust_phi::mechanism::RepertoireType::EFFECT, state, &marginal);
 
-    // search concept
+    // search a concept
     let mechanism_ab = rust_phi::basis::BitBasis::construct_from_mask(0b011, 3);
     let concept_ab = rust_phi::mechanism::search_concept_with_parts(&mechanism_ab, &cause_parts, &effect_parts).unwrap();
     println!("MICE of AB:");
@@ -42,5 +42,23 @@ fn main() {
 
     let mechanism_ac = rust_phi::basis::BitBasis::construct_from_mask(0b101, 3);
     let concept_ac = rust_phi::mechanism::search_concept_with_parts(&mechanism_ac, &cause_parts, &effect_parts);
-    println!("Concept of AB: {:?}", concept_ac) // None because AC is fully reduced
+    println!("Concept of AB: {:?}", concept_ac); // None because AC is fully reduced
+
+    // partition a system
+    let system_basis = rust_phi::basis::BitBasis::construct_from_mask(0b111, 3);
+    let partition = rust_phi::partition::SystemPartition { // cut AB -> C
+        cut_from: vec![0, 1],
+        cut_to: vec![2],
+    };
+
+    let partitioned_tpm = rust_phi::tpm::calc_partitioned_marginal_tpm(&partition, &system_basis, &marginal);
+    let partitioned_cause_parts =  rust_phi::mechanism::generate_all_repertoire_parts(rust_phi::mechanism::RepertoireType::CAUSE, state, &partitioned_tpm);
+    let partitioned_effect_parts =  rust_phi::mechanism::generate_all_repertoire_parts(rust_phi::mechanism::RepertoireType::EFFECT, state, &partitioned_tpm);
+
+    // calculate a big phi
+    let constellation =  rust_phi::mechanism::search_constellation_with_parts(&system_basis, &cause_parts, &effect_parts);
+    let partitioned_constellation =  rust_phi::mechanism::search_constellation_with_parts(&system_basis, &partitioned_cause_parts, &partitioned_effect_parts);
+
+    let big_phi =  rust_phi::emd::calc_constellation_emd(&constellation, &partitioned_constellation);
+    println!("Big phi: {}", big_phi);
 }

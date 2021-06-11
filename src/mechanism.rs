@@ -48,6 +48,10 @@ pub fn search_core_with_parts(mechanism: &BitBasis, parts: &na::DMatrix<f64>) ->
     let mechanism_mask = mechanism.to_mask();
 
     let mut max_phi_repertoire: Option<CoreRepertoire> = None;
+    let mut max_null_distance = 0.0;
+
+    let unconstrained_row = !(usize::MAX << mechanism.max_dim) << mechanism.max_dim;
+    let unconstrained = construct_vector_from_row(unconstrained_row, parts);
 
     for purview_mask in 0..mechanism.max_image_size() {
         let candidate = BitBasis::construct_from_mask(purview_mask, mechanism.max_dim);
@@ -58,14 +62,15 @@ pub fn search_core_with_parts(mechanism: &BitBasis, parts: &na::DMatrix<f64>) ->
 
         let c_candidate = candidate.generate_complement_basis();
 
-        let unconstrained_row = c_candidate.to_mask() << mechanism.max_dim;
-        let unconstrained = construct_vector_from_row(unconstrained_row, parts);
+        let unconstrained_part_row = c_candidate.to_mask() << mechanism.max_dim;
+        let unconstrained_part = construct_vector_from_row(unconstrained_part_row, parts);
 
         let criterion_row = (purview_mask << mechanism.max_dim) | mechanism_mask;
         let mut criterion = construct_vector_from_row(criterion_row, parts);
-        criterion.component_mul_assign(&unconstrained);
+        criterion.component_mul_assign(&unconstrained_part);
 
         let mut min_emd = f64::INFINITY;
+        let mut null_distance: Option<f64> = None;
 
         let partitions = MechanismPartitionIterator::construct(candidate.dim, mechanism.dim);
         for partition in partitions {
@@ -74,7 +79,7 @@ pub fn search_core_with_parts(mechanism: &BitBasis, parts: &na::DMatrix<f64>) ->
             let left_mechanism_mask = mechanism.sub_basis(&partition.left_mechanism).to_mask();
             let right_mechanism_mask = mechanism.sub_basis(&partition.right_mechanism).to_mask();
 
-            let mut joint = unconstrained.clone();
+            let mut joint = unconstrained_part.clone();
             joint.component_mul_assign(&construct_vector_from_row(left_purview_mask | left_mechanism_mask, parts));
             joint.component_mul_assign(&construct_vector_from_row(right_purview_mask | right_mechanism_mask, parts));
 
@@ -91,16 +96,25 @@ pub fn search_core_with_parts(mechanism: &BitBasis, parts: &na::DMatrix<f64>) ->
 
         if min_emd != 0.0 {
             let update = if let Some(v) = &max_phi_repertoire {
-                if min_emd > v.phi {
-                    true
-                } else {
-                    false
+                match min_emd {
+                    x if x > v.phi => true,
+                    x if x == v.phi && {
+                        null_distance = Some(calc_repertoire_emd(&criterion, &unconstrained));
+                        null_distance.unwrap() > max_null_distance
+                    }  => true,
+                    _ => false,
                 }
             } else {
                 true
             };
 
             if update {
+                max_null_distance = if let Some(v) = null_distance {
+                    v
+                } else {
+                    calc_repertoire_emd(&criterion, &unconstrained)
+                };
+
                 max_phi_repertoire = Some(CoreRepertoire {
                     purview: candidate,
                     repertoire: criterion,

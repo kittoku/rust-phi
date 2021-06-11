@@ -388,5 +388,5 @@ fn test_calc_constellation_emd() {
 
     let big_phi = calc_constellation_emd(&intact, &partitioned);
 
-    println!("BIG PHI: {}", big_phi) // Currently, the above big_phi is not according to the original paper
+    assert_almost_equal_scalar(big_phi, 1.9166666666);
 }
