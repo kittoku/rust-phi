@@ -1,6 +1,6 @@
 use std::usize;
 use nalgebra as na;
-use crate::{basis::BitBasis, emd::calc_emd_for_mechanism, mechanism::{generate_all_repertoire_parts, search_concept_with_parts}, partition::SystemPartition, repertoire::{calc_cause_repertoire, calc_effect_repertoire, normalize_repertoire}, tpm::calc_partitioned_marginal_tpm};
+use crate::{basis::BitBasis, emd::{calc_constellation_emd, calc_repertoire_emd}, mechanism::{generate_all_repertoire_parts, search_concept_with_parts, search_constellation_with_parts}, partition::SystemPartition, repertoire::{calc_cause_repertoire, calc_effect_repertoire, normalize_repertoire}, tpm::calc_partitioned_marginal_tpm};
 
 
 const EPSILON : f64 = 1.0e-7;
@@ -50,7 +50,7 @@ fn assert_almost_equal_matrix(actual: &na::DMatrix<f64>, expected: &na::DMatrix<
 }
 
 #[test]
-fn test_calc_emd_for_mechanism() {
+fn test_calc_repertoire_emd() {
     let mut vec_from = Vec::<na::DVector<f64>>::new();
     let mut vec_to = Vec::<na::DVector<f64>>::new();
     let mut expected = Vec::<f64>::new();
@@ -77,7 +77,7 @@ fn test_calc_emd_for_mechanism() {
 
 
     expected.into_iter().enumerate().for_each(|(i, e)| {
-        let actual = calc_emd_for_mechanism(&vec_from[i], &vec_to[i]).objective();
+        let actual = calc_repertoire_emd(&vec_from[i], &vec_to[i]);
         assert_almost_equal_scalar(actual, e);
         notify_pass(i);
     });
@@ -347,9 +347,9 @@ fn test_calc_partitioned_marginal_tpm() {
         cut_to: vec![1, 2],
     };
 
-    let actual = calc_partitioned_marginal_tpm(&partition, &system_basis, &tpm);
+    let actual_partitioned_tpm = calc_partitioned_marginal_tpm(&partition, &system_basis, &tpm);
 
-    let expected = na::DMatrix::<f64>::from_row_slice(8, 8, &[
+    let expected_partitioned_tpm = na::DMatrix::<f64>::from_row_slice(8, 8, &[
         0.5, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0,
         0.5, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0,
         0.0, 0.5, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0,
@@ -360,5 +360,33 @@ fn test_calc_partitioned_marginal_tpm() {
         0.0, 0.25, 0.0, 0.25, 0.0, 0.25, 0.0, 0.25,
     ]);
 
-    assert_almost_equal_matrix(&actual, &expected);
+    assert_almost_equal_matrix(&actual_partitioned_tpm, &expected_partitioned_tpm);
+}
+
+#[test]
+fn test_calc_constellation_emd() {
+    let current_state = generate_reference_state();
+
+    let tpm = generate_reference_tpm();
+
+    let system_basis = BitBasis::construct_from_mask(0b111, 3);
+    let partition = SystemPartition {
+        cut_from: vec![0, 1],
+        cut_to: vec![2],
+    };
+
+    let partitioned_tpm = calc_partitioned_marginal_tpm(&partition, &system_basis, &tpm);
+
+    let intact_cause_parts = generate_all_repertoire_parts(crate::mechanism::RepertoireType::CAUSE, current_state, &tpm);
+    let intact_effect_parts = generate_all_repertoire_parts(crate::mechanism::RepertoireType::EFFECT, current_state, &tpm);
+
+    let partitioned_cause_parts = generate_all_repertoire_parts(crate::mechanism::RepertoireType::CAUSE, current_state, &partitioned_tpm);
+    let partitioned_effect_parts = generate_all_repertoire_parts(crate::mechanism::RepertoireType::EFFECT, current_state, &partitioned_tpm);
+
+    let intact = search_constellation_with_parts(&system_basis, &intact_cause_parts, &intact_effect_parts);
+    let partitioned = search_constellation_with_parts(&system_basis, &partitioned_cause_parts, &partitioned_effect_parts);
+
+    let big_phi = calc_constellation_emd(&intact, &partitioned);
+
+    println!("BIG PHI: {}", big_phi) // Currently, the above big_phi is not according to the original paper
 }
