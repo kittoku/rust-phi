@@ -7,6 +7,7 @@ pub mod basis;
 pub mod repertoire;
 pub mod partition;
 pub mod mechanism;
+pub mod system;
 
 #[cfg(test)]
 pub mod tests;

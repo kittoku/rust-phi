@@ -176,13 +176,14 @@ pub fn calc_elementary_marginal_tpm(target_basis: &BitBasis, surviving_basis: &B
     marginal
 }
 
-pub fn calc_partitioned_marginal_tpm(partition: &SystemPartition, system_basis: &BitBasis, tpm: &na::DMatrix<f64>) -> na::DMatrix<f64> {
+pub fn calc_partitioned_marginal_tpm(partition: &SystemPartition, tpm: &na::DMatrix<f64>) -> na::DMatrix<f64> {
+    let system_basis = BitBasis::construct_from_max_image_size(tpm.nrows());
     let template_basis = system_basis.sub_basis(&[partition.cut_from[0]]);
-    let mut marginal = calc_elementary_marginal_tpm(&template_basis, system_basis, tpm);
+    let mut marginal = calc_elementary_marginal_tpm(&template_basis, &system_basis, tpm);
 
     (1..partition.cut_from.len()).for_each(|i| {
         let intact_basis = system_basis.sub_basis(&[partition.cut_from[i]]);
-        marginal.component_mul_assign(&calc_elementary_marginal_tpm(&intact_basis, system_basis, tpm));
+        marginal.component_mul_assign(&calc_elementary_marginal_tpm(&intact_basis, &system_basis, tpm));
     });
 
     let isolated_basis = system_basis.sub_basis(&partition.cut_to);

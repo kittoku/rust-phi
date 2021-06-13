@@ -1,6 +1,6 @@
 use std::usize;
 use nalgebra as na;
-use crate::{basis::BitBasis, emd::{calc_constellation_emd, calc_repertoire_emd}, mechanism::{generate_all_repertoire_parts, search_concept_with_parts, search_constellation_with_parts}, partition::SystemPartition, repertoire::{calc_cause_repertoire, calc_effect_repertoire, normalize_repertoire}, tpm::calc_partitioned_marginal_tpm};
+use crate::{basis::BitBasis, emd::{calc_constellation_emd, calc_repertoire_emd}, mechanism::{generate_all_repertoire_parts, search_concept_with_parts}, partition::SystemPartition, repertoire::{calc_cause_repertoire, calc_effect_repertoire, normalize_repertoire}, system::{search_constellation_with_mip, search_constellation_with_parts}, tpm::calc_partitioned_marginal_tpm};
 
 
 const EPSILON : f64 = 1.0e-7;
@@ -326,11 +326,7 @@ fn test_search_concept_with_parts() {
     (0..mechanisms.len()).for_each(|i| {
         let mechanism = BitBasis::construct_from_mask(mechanisms[i], 3);
         let concept = search_concept_with_parts(&mechanism, &cause_parts, &effect_parts);
-        let actual = if let Some(v) = concept {
-            v.core_cause.phi.min(v.core_effect.phi)
-        } else {
-            0.0
-        };
+        let actual = concept.phi;
 
         assert_almost_equal_scalar(actual, expected[i]);
         notify_pass(i);
@@ -341,13 +337,12 @@ fn test_search_concept_with_parts() {
 fn test_calc_partitioned_marginal_tpm() {
     let tpm = generate_reference_tpm();
 
-    let system_basis = BitBasis::construct_from_mask(0b111, 3);
     let partition = SystemPartition {
         cut_from: vec![0],
         cut_to: vec![1, 2],
     };
 
-    let actual_partitioned_tpm = calc_partitioned_marginal_tpm(&partition, &system_basis, &tpm);
+    let actual_partitioned_tpm = calc_partitioned_marginal_tpm(&partition, &tpm);
 
     let expected_partitioned_tpm = na::DMatrix::<f64>::from_row_slice(8, 8, &[
         0.5, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0,
@@ -369,13 +364,12 @@ fn test_calc_constellation_emd() {
 
     let tpm = generate_reference_tpm();
 
-    let system_basis = BitBasis::construct_from_mask(0b111, 3);
     let partition = SystemPartition {
         cut_from: vec![0, 1],
         cut_to: vec![2],
     };
 
-    let partitioned_tpm = calc_partitioned_marginal_tpm(&partition, &system_basis, &tpm);
+    let partitioned_tpm = calc_partitioned_marginal_tpm(&partition, &tpm);
 
     let intact_cause_parts = generate_all_repertoire_parts(crate::mechanism::RepertoireType::CAUSE, current_state, &tpm);
     let intact_effect_parts = generate_all_repertoire_parts(crate::mechanism::RepertoireType::EFFECT, current_state, &tpm);
@@ -383,10 +377,19 @@ fn test_calc_constellation_emd() {
     let partitioned_cause_parts = generate_all_repertoire_parts(crate::mechanism::RepertoireType::CAUSE, current_state, &partitioned_tpm);
     let partitioned_effect_parts = generate_all_repertoire_parts(crate::mechanism::RepertoireType::EFFECT, current_state, &partitioned_tpm);
 
-    let intact = search_constellation_with_parts(&system_basis, &intact_cause_parts, &intact_effect_parts);
-    let partitioned = search_constellation_with_parts(&system_basis, &partitioned_cause_parts, &partitioned_effect_parts);
+    let intact = search_constellation_with_parts(&intact_cause_parts, &intact_effect_parts);
+    let partitioned = search_constellation_with_parts(&partitioned_cause_parts, &partitioned_effect_parts);
 
     let extended_emd = calc_constellation_emd(&intact, &partitioned);
 
     assert_almost_equal_scalar(extended_emd, 1.9166666666);
+}
+
+#[test]
+fn test_search_constellation_with_mip() {
+    let current_state = generate_reference_state();
+    let tpm = generate_reference_tpm();
+
+    let constellation_with_mip = search_constellation_with_mip(current_state, &tpm);
+    println!("{:?}", constellation_with_mip.mip);
 }

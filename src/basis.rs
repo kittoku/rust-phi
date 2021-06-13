@@ -67,6 +67,16 @@ impl BitBasis {
         BitBasis::construct_from_vectors(&generate_vectors_from_mask(mask), max_dim)
     }
 
+    pub fn construct_from_max_image_size(max_image_size: usize) -> BitBasis {
+        assert!(max_image_size != 0);
+        assert!(max_image_size.count_ones() == 1);
+
+        let mask = max_image_size - 1;
+        let dim = mask.count_ones() as usize;
+
+        BitBasis::construct_from_mask(mask, dim)
+    }
+
     pub fn generate_complement_basis(&self) -> BitBasis {
         let union = self.vectors.iter().fold(0, |acc, &vector| acc | vector );
         let mut complement = Vec::<usize>::with_capacity(self.codim);

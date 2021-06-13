@@ -8,6 +8,18 @@ pub struct MechanismPartition {
     pub right_purview: Vec<usize>,
     pub right_mechanism: Vec<usize>,
 }
+
+impl MechanismPartition {
+    pub fn null_partition() -> MechanismPartition {
+        MechanismPartition {
+            left_purview: Vec::<usize>::new(),
+            left_mechanism: Vec::<usize>::new(),
+            right_purview: Vec::<usize>::new(),
+            right_mechanism: Vec::<usize>::new(),
+        }
+    }
+}
+
 pub struct MechanismPartitionIterator {
     current: usize,
     purview_size: usize,
@@ -77,6 +89,16 @@ pub struct SystemPartition {
     pub cut_from: Vec<usize>,
     pub cut_to: Vec<usize>,
 }
+
+impl SystemPartition {
+    pub fn null_partition() -> SystemPartition {
+        SystemPartition {
+            cut_from: Vec::<usize>::new(),
+            cut_to: Vec::<usize>::new(),
+        }
+    }
+}
+
 pub struct SystemPartitionIterator {
     current: usize,
     mask_size: usize,

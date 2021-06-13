@@ -1,7 +1,7 @@
 use nalgebra as na;
 use minilp::{LinearExpr, Problem};
 
-use crate::mechanism::Constellation;
+use crate::system::Constellation;
 
 
 fn check_dimension(vec_from: &na::DVector<f64>, vec_to: &na::DVector<f64>) -> usize {

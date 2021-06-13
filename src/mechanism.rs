@@ -1,5 +1,5 @@
 use nalgebra as na;
-use crate::{basis::BitBasis, emd::calc_repertoire_emd, partition::MechanismPartitionIterator, repertoire::{calc_cause_repertoire, calc_effect_repertoire}};
+use crate::{basis::BitBasis, emd::calc_repertoire_emd, partition::{MechanismPartition, MechanismPartitionIterator}, repertoire::{calc_cause_repertoire, calc_effect_repertoire}};
 
 
 pub enum RepertoireType {
@@ -37,6 +37,7 @@ pub fn generate_all_repertoire_parts(repertoire_type: RepertoireType, current_st
 pub struct CoreRepertoire {
     pub purview: BitBasis,
     pub repertoire: na::DVector<f64>,
+    pub partition: MechanismPartition,
     pub phi: f64,
 }
 
@@ -44,14 +45,14 @@ pub fn construct_vector_from_row(row: usize, matrix: &na::DMatrix<f64>) -> na::D
     na::DVector::<f64>::from_iterator(matrix.ncols(), matrix.row(row).iter().map(|x| *x))
 }
 
-pub fn search_core_with_parts(mechanism: &BitBasis, parts: &na::DMatrix<f64>) -> Option<CoreRepertoire> {
+pub fn search_core_with_parts(mechanism: &BitBasis, parts: &na::DMatrix<f64>) -> CoreRepertoire {
     let mechanism_mask = mechanism.to_mask();
-
-    let mut max_phi_repertoire: Option<CoreRepertoire> = None;
-    let mut max_null_distance = 0.0;
 
     let unconstrained_row = !(usize::MAX << mechanism.max_dim) << mechanism.max_dim;
     let unconstrained = construct_vector_from_row(unconstrained_row, parts);
+
+    let mut max_null_distance = 0.0;
+    let mut max_phi_repertoire: Option<CoreRepertoire> = None;
 
     for purview_mask in 0..mechanism.max_image_size() {
         let candidate = BitBasis::construct_from_mask(purview_mask, mechanism.max_dim);
@@ -69,7 +70,8 @@ pub fn search_core_with_parts(mechanism: &BitBasis, parts: &na::DMatrix<f64>) ->
         let mut criterion = construct_vector_from_row(criterion_row, parts);
         criterion.component_mul_assign(&unconstrained_part);
 
-        let mut min_emd = f64::INFINITY;
+        let mut min_emd: Option<f64> = None;
+        let mut mip = MechanismPartition::null_partition();
         let mut null_distance: Option<f64> = None;
 
         let partitions = MechanismPartitionIterator::construct(candidate.dim, mechanism.dim);
@@ -85,46 +87,56 @@ pub fn search_core_with_parts(mechanism: &BitBasis, parts: &na::DMatrix<f64>) ->
 
             let emd = calc_repertoire_emd(&criterion, &joint);
 
-            if emd < min_emd {
-                min_emd = emd;
-            }
+            if let Some(v) = min_emd {
+                if emd < v {
+                    min_emd = Some(emd);
+                    mip = partition;
+                }
 
-            if min_emd == 0.0 {
+            } else {
+                min_emd = Some(emd);
+            };
+
+            if min_emd.unwrap() ==  0.0 {
                 break;
             }
         }
 
-        if min_emd != 0.0 {
-            let update = if let Some(v) = &max_phi_repertoire {
-                match min_emd {
-                    x if x > v.phi => true,
-                    x if x == v.phi && {
-                        null_distance = Some(calc_repertoire_emd(&criterion, &unconstrained));
-                        null_distance.unwrap() > max_null_distance
-                    }  => true,
-                    _ => false,
-                }
+        if min_emd.is_none() { // no possible partition found
+            min_emd = Some(0.0);
+        }
+
+        let update = if let Some(repertoire) = &max_phi_repertoire {
+            match min_emd.unwrap() {
+                x if x == 0.0 => false,
+                x if x > repertoire.phi => true,
+                x if x == repertoire.phi && {
+                    null_distance = Some(calc_repertoire_emd(&criterion, &unconstrained));
+                    null_distance.unwrap() > max_null_distance
+                }  => true,
+                _ => false,
+            }
+        } else {
+            true
+        };
+
+        if update {
+            max_null_distance = if let Some(v) = null_distance {
+                v
             } else {
-                true
+                calc_repertoire_emd(&criterion, &unconstrained)
             };
 
-            if update {
-                max_null_distance = if let Some(v) = null_distance {
-                    v
-                } else {
-                    calc_repertoire_emd(&criterion, &unconstrained)
-                };
-
-                max_phi_repertoire = Some(CoreRepertoire {
-                    purview: candidate,
-                    repertoire: criterion,
-                    phi: min_emd,
-                });
-            }
+            max_phi_repertoire = Some(CoreRepertoire {
+                purview: candidate,
+                repertoire: criterion,
+                partition: mip,
+                phi: min_emd.unwrap(),
+            });
         }
     };
 
-    max_phi_repertoire
+    max_phi_repertoire.unwrap()
 }
 
 #[derive(Debug)]
@@ -145,67 +157,16 @@ impl Concept {
     }
 }
 
-pub fn search_concept_with_parts(mechanism: &BitBasis, cause_parts: &na::DMatrix<f64>, effect_parts: &na::DMatrix<f64>) -> Option<Concept> {
-    let core_cause = if let Some(v) = search_core_with_parts(mechanism, cause_parts) {
-        v
-    } else {
-        return None;
-    };
-
-    let core_effect = if let Some(v) = search_core_with_parts(mechanism, effect_parts) {
-        v
-    } else {
-        return None;
-    };
+pub fn search_concept_with_parts(mechanism: &BitBasis, cause_parts: &na::DMatrix<f64>, effect_parts: &na::DMatrix<f64>) -> Concept {
+    let core_cause = search_core_with_parts(mechanism, cause_parts);
+    let core_effect = search_core_with_parts(mechanism, effect_parts);
 
     let phi = core_cause.phi.min(core_effect.phi);
 
-    Some(Concept {
+    Concept {
         mechanism: mechanism.clone(),
         core_cause: core_cause,
         core_effect: core_effect,
         phi: phi,
-    })
-}
-
-#[derive(Debug)]
-pub struct Constellation {
-    pub concepts: Vec<Concept>,
-    pub null_concept: Concept,
-}
-
-pub fn search_constellation_with_parts(system_basis: &BitBasis, cause_parts: &na::DMatrix<f64>, effect_parts: &na::DMatrix<f64>) -> Constellation {
-    let mut concepts = Vec::<Concept>::new();
-
-    (1..system_basis.max_image_size()).for_each(|mask| {
-        let mechanism = BitBasis::construct_from_mask(mask, system_basis.max_dim);
-
-        if let Some(concept) = search_concept_with_parts(&mechanism, cause_parts, effect_parts) {
-            concepts.push(concept);
-        }
-    });
-
-    let unconstrained_mask = system_basis.to_mask() << system_basis.max_dim;
-    let unconstrained_cause = construct_vector_from_row(unconstrained_mask, cause_parts);
-    let unconstrained_effect = construct_vector_from_row(unconstrained_mask, effect_parts);
-
-    let null_concept = Concept {
-        mechanism: BitBasis::null_basis(system_basis.max_dim),
-        core_cause: CoreRepertoire {
-            purview: BitBasis::null_basis(system_basis.max_dim),
-            repertoire: unconstrained_cause,
-            phi: 0.0,
-        },
-        core_effect: CoreRepertoire {
-            purview: BitBasis::null_basis(system_basis.max_dim),
-            repertoire: unconstrained_effect,
-            phi: 0.0,
-        },
-        phi: 0.0,
-    };
-
-    Constellation {
-        concepts: concepts,
-        null_concept: null_concept,
     }
 }
