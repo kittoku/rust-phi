@@ -1,18 +1,14 @@
 use std::usize;
 use nalgebra as na;
-use crate::{basis::BitBasis, emd::{calc_constellation_emd, calc_repertoire_emd}, mechanism::{generate_all_repertoire_parts, search_concept_with_parts}, partition::SystemPartition, repertoire::{calc_cause_repertoire, calc_effect_repertoire, normalize_repertoire}, system::{search_constellation_with_mip, search_constellation_with_parts}, tpm::calc_partitioned_marginal_tpm};
+use crate::{basis::BitBasis, compare::{Comparison, compare_roughly}, emd::{calc_constellation_emd, calc_repertoire_emd}, mechanism::{generate_all_repertoire_parts, search_concept_with_parts}, partition::SystemPartition, repertoire::{calc_cause_repertoire, calc_effect_repertoire, normalize_repertoire}, system::{search_constellation_with_mip, search_constellation_with_parts}, tpm::calc_partitioned_marginal_tpm};
 
-
-const EPSILON : f64 = 1.0e-7;
 
 fn notify_pass(case_number: usize) {
     println!("CASE_{} ... PASSED", case_number)
 }
 
 fn assert_almost_equal_scalar(actual: f64, expected: f64) {
-    let diff = (actual - expected).abs();
-
-    if diff > EPSILON {
+    if let Comparison::NotEqual(diff) = compare_roughly(actual, expected) {
         let mut message = String::from("The given scalars are too different: \n");
         message += &format!("actual -> {:?}\n", actual);
         message += &format!("expected -> {:?}\n", expected);
@@ -25,7 +21,7 @@ fn assert_almost_equal_vec(actual: &na::DVector<f64>, expected: &na::DVector<f64
     let diff = (actual - expected).abs();
 
     diff.iter().for_each(|&x| {
-        if x > EPSILON {
+        if let Comparison::NotEqual(_) = compare_roughly(x, 0.0) {
             let mut message = String::from("The given vectors are too different: \n");
             message += &format!("actual -> {:?}\n", actual);
             message += &format!("expected -> {:?}\n", expected);
@@ -39,7 +35,7 @@ fn assert_almost_equal_matrix(actual: &na::DMatrix<f64>, expected: &na::DMatrix<
     let diff = (actual - expected).abs();
 
     diff.iter().for_each(|&x| {
-        if x > EPSILON {
+        if let Comparison::NotEqual(_) = compare_roughly(x, 0.0) {
             let mut message = String::from("The given matrices are too different: \n");
             message += &format!("actual -> {:?}\n", actual);
             message += &format!("expected -> {:?}\n", expected);
