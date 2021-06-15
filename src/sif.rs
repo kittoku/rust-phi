@@ -4,7 +4,7 @@ use strum_macros::EnumString;
 
 #[derive(Debug, EnumString)]
 pub enum LinkType {
-    ID,
+    COPY,
     NOT,
     OR,
     AND,

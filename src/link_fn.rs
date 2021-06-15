@@ -14,7 +14,7 @@ fn to_float(b: bool) -> f64 {
 }
 
 
-fn link_id(env: usize, mask: usize) -> f64 {
+fn link_copy(env: usize, mask: usize) -> f64 {
     to_float(env & mask > 0)
 }
 
@@ -57,7 +57,7 @@ fn link_noisy(_env: usize, _mask: usize) -> f64 {
 
 pub fn get_link_fn(link: &LinkType, size: usize) -> LinkFn {
     match link {
-        LinkType::ID if size == 1 => link_id,
+        LinkType::COPY if size == 1 => link_copy,
         LinkType::NOT if size == 1 => link_not,
         LinkType::AND if size == 2 => link_and,
         LinkType::OR if size == 2 => link_or,
