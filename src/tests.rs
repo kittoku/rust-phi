@@ -386,6 +386,10 @@ fn test_search_constellation_with_mip() {
     let current_state = generate_reference_state();
     let tpm = generate_reference_tpm();
 
-    let constellation_with_mip = search_constellation_with_mip(current_state, &tpm);
-    println!("{:?}", constellation_with_mip.mip);
+    let constellation = search_constellation_with_mip(current_state, &tpm);
+    let mip = constellation.mip;
+
+    assert_eq!(mip.partition.cut_from, [0, 1]);
+    assert_eq!(mip.partition.cut_to, [2]);
+    assert_almost_equal_scalar(mip.phi, 1.9166666666);
 }

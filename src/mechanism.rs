@@ -1,5 +1,5 @@
 use nalgebra as na;
-use crate::{basis::BitBasis, emd::calc_repertoire_emd, partition::{MechanismPartition, MechanismPartitionIterator}, repertoire::{calc_cause_repertoire, calc_effect_repertoire}};
+use crate::{basis::BitBasis, compare::{Comparison, compare_roughly}, emd::calc_repertoire_emd, partition::{MechanismPartition, MechanismPartitionIterator}, repertoire::{calc_cause_repertoire, calc_effect_repertoire}};
 
 
 pub enum RepertoireType {
@@ -48,10 +48,6 @@ pub fn construct_vector_from_row(row: usize, matrix: &na::DMatrix<f64>) -> na::D
 pub fn search_core_with_parts(mechanism: &BitBasis, parts: &na::DMatrix<f64>) -> CoreRepertoire {
     let mechanism_mask = mechanism.to_mask();
 
-    let unconstrained_row = !(usize::MAX << mechanism.max_dim) << mechanism.max_dim;
-    let unconstrained = construct_vector_from_row(unconstrained_row, parts);
-
-    let mut max_null_distance = 0.0;
     let mut max_phi_repertoire: Option<CoreRepertoire> = None;
 
     for purview_mask in 0..mechanism.max_image_size() {
@@ -72,7 +68,6 @@ pub fn search_core_with_parts(mechanism: &BitBasis, parts: &na::DMatrix<f64>) ->
 
         let mut min_emd: Option<f64> = None;
         let mut mip = MechanismPartition::null_partition();
-        let mut null_distance: Option<f64> = None;
 
         let partitions = MechanismPartitionIterator::construct(candidate.dim, mechanism.dim);
         for partition in partitions {
@@ -107,26 +102,17 @@ pub fn search_core_with_parts(mechanism: &BitBasis, parts: &na::DMatrix<f64>) ->
         }
 
         let update = if let Some(repertoire) = &max_phi_repertoire {
-            match min_emd.unwrap() {
-                x if x == 0.0 => false,
-                x if x > repertoire.phi => true,
-                x if x == repertoire.phi && {
-                    null_distance = Some(calc_repertoire_emd(&criterion, &unconstrained));
-                    null_distance.unwrap() > max_null_distance
-                }  => true,
-                _ => false,
+            let unwrapped = min_emd.unwrap();
+            if let Comparison::NotEqual(diff) = compare_roughly(unwrapped, repertoire.phi) {
+                diff.is_sign_positive()
+            } else {
+                candidate.dim > repertoire.purview.dim
             }
         } else {
             true
         };
 
         if update {
-            max_null_distance = if let Some(v) = null_distance {
-                v
-            } else {
-                calc_repertoire_emd(&criterion, &unconstrained)
-            };
-
             max_phi_repertoire = Some(CoreRepertoire {
                 purview: candidate,
                 repertoire: criterion,
