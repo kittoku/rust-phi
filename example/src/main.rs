@@ -34,31 +34,37 @@ fn main() {
 
     // search a concept
     let mechanism_ab = rust_phi::basis::BitBasis::construct_from_mask(0b011, 3);
-    let concept_ab = rust_phi::mechanism::search_concept_with_parts(&mechanism_ab, &cause_parts, &effect_parts).unwrap();
-    println!("MICE of AB:");
+    let concept_ab = rust_phi::mechanism::search_concept_with_parts(&mechanism_ab, &cause_parts, &effect_parts);
+    println!("Concept AB:");
     println!("CAUSE -> {}", concept_ab.core_cause.repertoire);
     println!("EFFECT -> {}", concept_ab.core_effect.repertoire);
-    println!("phi -> {}", concept_ab.core_cause.phi.min(concept_ab.core_effect.phi));
+    println!("phi -> {}", concept_ab.phi);
 
     let mechanism_ac = rust_phi::basis::BitBasis::construct_from_mask(0b101, 3);
     let concept_ac = rust_phi::mechanism::search_concept_with_parts(&mechanism_ac, &cause_parts, &effect_parts);
-    println!("Concept of AB: {:?}", concept_ac); // None because AC is fully reduced
+    println!("Concept AC"); // means AC is fully reduced
+    println!("phi -> {}", concept_ac.phi); // means AC is fully reduced
 
     // partition a system
-    let system_basis = rust_phi::basis::BitBasis::construct_from_mask(0b111, 3);
-    let partition = rust_phi::partition::SystemPartition { // cut AB -> C
-        cut_from: vec![0, 1],
-        cut_to: vec![2],
+    let partition = rust_phi::partition::SystemPartition { // cut A -> BC
+        cut_from: vec![0],
+        cut_to: vec![1, 2],
     };
 
-    let partitioned_tpm = rust_phi::tpm::calc_partitioned_marginal_tpm(&partition, &system_basis, &marginal);
-    let partitioned_cause_parts =  rust_phi::mechanism::generate_all_repertoire_parts(rust_phi::mechanism::RepertoireType::CAUSE, state, &partitioned_tpm);
-    let partitioned_effect_parts =  rust_phi::mechanism::generate_all_repertoire_parts(rust_phi::mechanism::RepertoireType::EFFECT, state, &partitioned_tpm);
+    let partitioned_tpm = rust_phi::tpm::calc_partitioned_marginal_tpm(&partition, &marginal);
+    let partitioned_cause_parts = rust_phi::mechanism::generate_all_repertoire_parts(rust_phi::mechanism::RepertoireType::CAUSE, state, &partitioned_tpm);
+    let partitioned_effect_parts = rust_phi::mechanism::generate_all_repertoire_parts(rust_phi::mechanism::RepertoireType::EFFECT, state, &partitioned_tpm);
 
     // calculate extended EMD
-    let constellation =  rust_phi::mechanism::search_constellation_with_parts(&system_basis, &cause_parts, &effect_parts);
-    let partitioned_constellation =  rust_phi::mechanism::search_constellation_with_parts(&system_basis, &partitioned_cause_parts, &partitioned_effect_parts);
+    let constellation = rust_phi::system::search_constellation_with_parts(&cause_parts, &effect_parts);
+    let partitioned_constellation = rust_phi::system::search_constellation_with_parts(&partitioned_cause_parts, &partitioned_effect_parts);
 
-    let extended_emd =  rust_phi::emd::calc_constellation_emd(&constellation, &partitioned_constellation);
-    println!("Distance between constellations: {}", extended_emd);
+    let extended_emd = rust_phi::emd::calc_constellation_emd(&constellation, &partitioned_constellation);
+    println!("Big phi when A =/=> BC: {}", extended_emd);
+
+    // search MIP
+    let constellation_mip = rust_phi::system::search_constellation_with_mip(state, &marginal);
+    let mip = constellation_mip.mip;
+    println!("MIP: {:?} =/=> {:?}", mip.partition.cut_from, mip.partition.cut_to); // [0, 1] =/=> [2] equivalent to AB =/=> C
+    println!("Max big phi: {}", mip.phi);
 }
