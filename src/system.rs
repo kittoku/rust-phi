@@ -1,5 +1,5 @@
 use nalgebra as na;
-use crate::{basis::BitBasis, emd::calc_constellation_emd, mechanism::{Concept, CoreRepertoire, construct_vector_from_row, generate_all_repertoire_parts, search_concept_with_parts}, partition::{MechanismPartition, SystemPartition, SystemPartitionIterator}, tpm::calc_partitioned_marginal_tpm};
+use crate::{basis::BitBasis, compare::{Comparison, compare_roughly}, emd::calc_constellation_emd, mechanism::{Concept, CoreRepertoire, construct_vector_from_row, generate_all_repertoire_parts, search_concept_with_parts}, partition::{MechanismPartition, SystemPartition, SystemPartitionIterator}, tpm::calc_partitioned_marginal_tpm};
 
 
 #[derive(Debug)]
@@ -82,6 +82,11 @@ pub fn search_constellation_with_mip(current_state: usize, tpm: &na::DMatrix<f64
         if emd < criterion.mip.phi {
             criterion.mip.partition = partition;
             criterion.mip.phi = emd;
+        }
+
+        if let Comparison::AlmostEqual = compare_roughly(emd, 0.0) {
+            criterion.mip.phi = 0.0;
+            break;
         }
     }
 
