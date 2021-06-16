@@ -48,7 +48,15 @@ pub fn construct_vector_from_row(row: usize, matrix: &na::DMatrix<f64>) -> na::D
 pub fn search_core_with_parts(mechanism: &BitBasis, parts: &na::DMatrix<f64>) -> CoreRepertoire {
     let mechanism_mask = mechanism.to_mask();
 
-    let mut max_phi_repertoire: Option<CoreRepertoire> = None;
+    let unconstrained_row = !(usize::MAX << mechanism.max_dim) << mechanism.max_dim;
+    let unconstrained = construct_vector_from_row(unconstrained_row, parts);
+
+    let mut max_phi_repertoire = CoreRepertoire {
+        purview: BitBasis::null_basis(mechanism.max_dim),
+        repertoire: unconstrained,
+        partition: MechanismPartition::null_partition(),
+        phi: 0.0,
+    };
 
     for purview_mask in 0..mechanism.max_image_size() {
         let candidate = BitBasis::construct_from_mask(purview_mask, mechanism.max_dim);
@@ -66,7 +74,7 @@ pub fn search_core_with_parts(mechanism: &BitBasis, parts: &na::DMatrix<f64>) ->
         let mut criterion = construct_vector_from_row(criterion_row, parts);
         criterion.component_mul_assign(&unconstrained_part);
 
-        let mut min_emd: Option<f64> = None;
+        let mut min_emd = f64::INFINITY;
         let mut mip = MechanismPartition::null_partition();
 
         let partitions = MechanismPartitionIterator::construct(candidate.dim, mechanism.dim);
@@ -81,48 +89,38 @@ pub fn search_core_with_parts(mechanism: &BitBasis, parts: &na::DMatrix<f64>) ->
             joint.component_mul_assign(&construct_vector_from_row(right_purview_mask | right_mechanism_mask, parts));
 
             let emd = calc_repertoire_emd(&criterion, &joint);
-
-            if let Some(v) = min_emd {
-                if emd < v {
-                    min_emd = Some(emd);
-                    mip = partition;
-                }
-
-            } else {
-                min_emd = Some(emd);
+            if emd < min_emd {
+                min_emd = emd;
+                mip = partition;
             };
 
-            if min_emd.unwrap() ==  0.0 {
+            if let Comparison::AlmostEqual = compare_roughly(min_emd, 0.0) {
+                min_emd = 0.0;
                 break;
             }
         }
 
-        if min_emd.is_none() { // no possible partition found
-            min_emd = Some(0.0);
+        if min_emd == f64::INFINITY { // no possible partition found
+            min_emd = 0.0;
         }
 
-        let update = if let Some(repertoire) = &max_phi_repertoire {
-            let unwrapped = min_emd.unwrap();
-            if let Comparison::NotEqual(diff) = compare_roughly(unwrapped, repertoire.phi) {
-                diff.is_sign_positive()
-            } else {
-                candidate.dim > repertoire.purview.dim
-            }
+        let update = if let Comparison::NotEqual(diff) = compare_roughly(min_emd, max_phi_repertoire.phi) {
+            diff.is_sign_positive()
         } else {
-            true
+            candidate.dim > max_phi_repertoire.purview.dim
         };
 
         if update {
-            max_phi_repertoire = Some(CoreRepertoire {
+            max_phi_repertoire = CoreRepertoire {
                 purview: candidate,
                 repertoire: criterion,
                 partition: mip,
-                phi: min_emd.unwrap(),
-            });
+                phi: min_emd,
+            };
         }
     };
 
-    max_phi_repertoire.unwrap()
+    max_phi_repertoire
 }
 
 #[derive(Debug)]
