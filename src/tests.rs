@@ -1,6 +1,6 @@
 use std::usize;
 use nalgebra as na;
-use crate::{basis::BitBasis, compare::{Comparison, compare_roughly}, emd::{calc_constellation_emd, calc_repertoire_emd}, mechanism::{generate_all_repertoire_parts, search_concept_with_parts}, partition::SystemPartition, repertoire::{calc_cause_repertoire, calc_effect_repertoire, normalize_repertoire}, system::{search_constellation_with_mip, search_constellation_with_parts}, tpm::calc_partitioned_marginal_tpm};
+use crate::{basis::BitBasis, compare::{Comparison, compare_roughly}, emd::{calc_constellation_emd, calc_repertoire_emd}, mechanism::{generate_all_repertoire_parts, search_concept_with_parts}, partition::SystemPartition, repertoire::{calc_cause_repertoire, calc_effect_repertoire, normalize_repertoire}, system::{search_complex, search_constellation_with_mip, search_constellation_with_parts}, tpm::calc_partitioned_marginal_tpm};
 
 
 fn notify_pass(case_number: usize) {
@@ -392,4 +392,15 @@ fn test_search_constellation_with_mip() {
     assert_eq!(mip.partition.cut_from, [0, 1]);
     assert_eq!(mip.partition.cut_to, [2]);
     assert_almost_equal_scalar(mip.phi, 1.9166666666);
+}
+
+#[test]
+fn test_search_complex() {
+    let current_state = generate_reference_state();
+    let tpm = generate_reference_tpm();
+
+    let complex = search_complex(current_state, tpm, 2, false);
+
+    assert_eq!(complex.elements, [0, 1, 2]);
+    assert_almost_equal_scalar(complex.constellation.mip.phi, 1.9166666666);
 }
