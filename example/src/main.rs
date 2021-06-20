@@ -1,3 +1,4 @@
+use std::sync::Arc;
 extern crate rust_phi;
 
 
@@ -66,14 +67,15 @@ fn main() {
     println!("Big phi when A =/=> BC: {}", extended_emd);
 
     // search MIP
-    let constellation_mip = rust_phi::system::search_constellation_with_mip(marginal_state, &marginal_tpm);
+    let arc_marginal = Arc::new(marginal_tpm.clone()); // for concurrency
+    let constellation_mip = rust_phi::system::search_constellation_with_mip(marginal_state, &arc_marginal, NUM_THREADS);
     let mip = constellation_mip.mip;
     println!("MIP: {:?} =/=> {:?}", mip.partition.cut_from, mip.partition.cut_to); // [0, 1] =/=> [2] equivalent to AB =/=> C
     println!("Max big phi: {}", mip.phi);
 
     // search complex
     let enable_log = true;
-    let complex = rust_phi::system::search_complex(marginal_state, marginal_tpm, NUM_THREADS, enable_log);
+    let complex = rust_phi::system::search_complex(marginal_state, &marginal_tpm, NUM_THREADS, enable_log);
     /*
         This takes relatively short time since `marginal_tpm` is used as a full-state tpm.
         If you want to search a complex among a system of ABCDEF, you need use `full_state_tpm`.
