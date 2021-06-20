@@ -1,3 +1,4 @@
 /target
 /example/target
+/benchmark/target
 Cargo.lock
