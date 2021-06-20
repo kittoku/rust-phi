@@ -1,4 +1,4 @@
-use std::{iter::Rev, ops::Range, sync::{Arc, Mutex}, thread::{self, JoinHandle}};
+use std::{sync::{Arc, Mutex}, thread::{self, JoinHandle}, time::SystemTime};
 
 use nalgebra as na;
 use crate::{basis::BitBasis, bitwise::USIZE_BASIS, compare::{Comparison, compare_roughly}, emd::calc_constellation_emd, mechanism::{Concept, CoreRepertoire, construct_vector_from_row, generate_all_repertoire_parts, search_concept_with_parts}, partition::{MechanismPartition, SystemPartition, SystemPartitionIterator}, tpm::{calc_fixed_marginal_tpm, calc_partitioned_marginal_tpm}};
@@ -61,119 +61,62 @@ pub fn search_constellation_with_parts(cause_parts: &na::DMatrix<f64>, effect_pa
     }
 }
 
-pub fn search_constellation_with_mip(current_state: usize, tpm: &na::DMatrix<f64>) -> Constellation {
-    let system_basis = BitBasis::construct_from_max_image_size(tpm.ncols());
+fn get_assigned_partition(partitions: &Arc<Mutex<SystemPartitionIterator>>) -> Option<SystemPartition> {
+    partitions.lock().unwrap().next()
+}
 
-    let cause_parts = generate_all_repertoire_parts(crate::mechanism::RepertoireType::CAUSE, current_state, &tpm);
-    let effect_parts = generate_all_repertoire_parts(crate::mechanism::RepertoireType::EFFECT, current_state, &tpm);
-    let mut criterion = search_constellation_with_parts(&cause_parts, &effect_parts);
-    criterion.mip = MinimumInformationPartition {
-        partition: SystemPartition::null_partition(),
-        phi: f64::INFINITY,
+fn challenge_update(emd: f64, partition: SystemPartition, mip: &Arc<Mutex<MinimumInformationPartition>>) -> bool {
+    // return false if MIP can fully reduce the system
+    let mut locked = mip.lock().unwrap();
+
+    if emd < locked.phi {
+        locked.partition = partition;
+        locked.phi = emd;
     };
 
-    let partitions = SystemPartitionIterator::construct(system_basis.max_dim);
-    for partition in partitions {
-        let partitioned_tpm = calc_partitioned_marginal_tpm(&partition, &tpm);
-        let partitioned_cause_parts = generate_all_repertoire_parts(crate::mechanism::RepertoireType::CAUSE, current_state, &partitioned_tpm);
-        let partitioned_effect_parts = generate_all_repertoire_parts(crate::mechanism::RepertoireType::EFFECT, current_state, &partitioned_tpm);
-        let partitioned = search_constellation_with_parts(&partitioned_cause_parts, &partitioned_effect_parts);
-
-        let emd = calc_constellation_emd(&criterion, &partitioned);
-
-        if emd < criterion.mip.phi {
-            criterion.mip.partition = partition;
-            criterion.mip.phi = emd;
-        }
-
-        if let Comparison::AlmostEqual = compare_roughly(emd, 0.0) {
-            criterion.mip.phi = 0.0;
-            break;
-        }
-    }
-
-    if criterion.mip.phi == f64::INFINITY { // no possible partition found
-        criterion.mip.phi = 0.0;
-    }
-
-    criterion
-}
-
-#[derive(Debug)]
-pub struct Complex {
-    pub elements: Vec<usize>,
-    pub marginal_tpm: na::DMatrix<f64>,
-    pub constellation: Constellation
-}
-
-fn get_assigned_mask(masks: &Arc<Mutex<Rev<Range<usize>>>>) -> Option<usize> {
-    masks.lock().unwrap().next()
-}
-
-fn notify_progress(complex: &Complex, current_count: &Arc<Mutex<usize>>, total_count: usize) {
-    let mut locked = current_count.lock().unwrap();
-    *locked += 1;
-
-    let progress = format!("PROGRESS={}/{}", locked, total_count);
-    let candidate = format!("CANDIDATE={:?}", complex.elements);
-    let phi = format!("BIG_PHI={}", complex.constellation.mip.phi);
-
-    println!("{}, {}, {}", progress, candidate, phi);
-}
-
-fn challenge_complex(complex: Complex, maximum: &Arc<Mutex<Option<Complex>>>) {
-    let mut locked = maximum.lock().unwrap();
-
-    let update = if let Some(v) = locked.as_ref() {
-        complex.constellation.mip.phi > v.constellation.mip.phi
+    if let Comparison::AlmostEqual = compare_roughly(locked.phi, 0.0) {
+        locked.phi = 0.0;
+        false
     } else {
         true
-    };
-
-    if update {
-        *locked = Some(complex);
-    };
+    }
 }
 
-pub fn search_complex(current_state: usize, tpm: na::DMatrix<f64>, num_threads: usize, log: bool) -> Complex {
-    let system_basis = Arc::new(BitBasis::construct_from_max_image_size(tpm.ncols()));
-    let max_image_size = system_basis.max_image_size();
+pub fn search_constellation_with_mip(current_state: usize, tpm: &Arc<na::DMatrix<f64>>, num_threads: usize) -> Constellation {
+    let system_basis = BitBasis::construct_from_max_image_size(tpm.ncols());
 
-    let shared_tpm = Arc::new(tpm);
-    let candidate_masks = Arc::new(Mutex::new((1..max_image_size).rev()));
-    let current_complex = Arc::new(Mutex::new(None));
-    let current_count = Arc::new(Mutex::new(0));
-    let total_count = max_image_size - 1;
+    let cause_parts = Arc::new(generate_all_repertoire_parts(crate::mechanism::RepertoireType::CAUSE, current_state, &tpm));
+    let effect_parts = Arc::new(generate_all_repertoire_parts(crate::mechanism::RepertoireType::EFFECT, current_state, &tpm));
+    let criterion = Arc::new(search_constellation_with_parts(&cause_parts, &effect_parts));
+
+    let mip = Arc::new(Mutex::new(MinimumInformationPartition {
+        partition: SystemPartition::null_partition(),
+        phi: f64::INFINITY,
+    }));
+
+    let partitions = Arc::new(Mutex::new(SystemPartitionIterator::construct(system_basis.max_dim)));
 
     let mut handles = Vec::<JoinHandle<()>>::new();
 
     (0..num_threads).for_each(|_| {
-        let cloned_basis = system_basis.clone();
-        let cloned_tpm = shared_tpm.clone();
-        let cloned_masks = candidate_masks.clone();
-        let cloned_complex = current_complex.clone();
-        let cloned_count = current_count.clone();
+        let cloned_tpm = tpm.clone();
+        let cloned_criterion = criterion.clone();
+        let cloned_mip = mip.clone();
+        let cloned_partitions = partitions.clone();
 
         let handle = thread::spawn(move || {
             loop {
-                if let Some(mask) = get_assigned_mask(&cloned_masks) {
-                    let candidate_elements: Vec<usize> = (0..cloned_basis.max_dim).filter(|&i| mask & USIZE_BASIS[i] != 0).collect();
-                    let candidate_basis = cloned_basis.sub_basis(candidate_elements.as_slice());
+                if let Some(partition) = get_assigned_partition(&cloned_partitions) {
+                    let partitioned_tpm = calc_partitioned_marginal_tpm(&partition, &cloned_tpm);
+                    let partitioned_cause_parts = generate_all_repertoire_parts(crate::mechanism::RepertoireType::CAUSE, current_state, &partitioned_tpm);
+                    let partitioned_effect_parts = generate_all_repertoire_parts(crate::mechanism::RepertoireType::EFFECT, current_state, &partitioned_tpm);
+                    let partitioned = search_constellation_with_parts(&partitioned_cause_parts, &partitioned_effect_parts);
 
-                    let marginal = calc_fixed_marginal_tpm(&candidate_basis, current_state, &cloned_tpm);
+                    let emd = calc_constellation_emd(&cloned_criterion, &partitioned);
 
-                    let constellation = search_constellation_with_mip(current_state, &marginal);
-                    let complex = Complex {
-                        elements: candidate_elements,
-                        marginal_tpm: marginal,
-                        constellation: constellation,
+                    if !challenge_update(emd, partition, &cloned_mip) {
+                        break;
                     };
-
-                    if log {
-                        notify_progress(&complex, &cloned_count, total_count)
-                    };
-
-                    challenge_complex(complex, &cloned_complex);
                 } else {
                     break;
                 }
@@ -191,6 +134,68 @@ pub fn search_complex(current_state: usize, tpm: na::DMatrix<f64>, num_threads: 
         }
     };
 
+    let mut final_mip = Arc::try_unwrap(mip).unwrap().into_inner().unwrap();
+    if final_mip.phi == f64::INFINITY { // no possible partition found
+        final_mip.phi = 0.0;
+    }
 
-    Arc::try_unwrap(current_complex).unwrap().into_inner().unwrap().unwrap()
+    let mut unwrapped = Arc::try_unwrap(criterion).unwrap();
+    unwrapped.mip = final_mip;
+    unwrapped
+}
+
+#[derive(Debug)]
+pub struct Complex {
+    pub elements: Vec<usize>,
+    pub marginal_tpm: na::DMatrix<f64>,
+    pub constellation: Constellation
+}
+
+fn notify_progress(candidate: &Vec<usize>, phi: f64, current_count: usize, total_count: usize, start_time: SystemTime) {
+    let progress = format!("PROGRESS={}/{}", current_count, total_count);
+    let candidate = format!("CANDIDATE={:?}", candidate);
+    let phi = format!("BIG_PHI={}", phi);
+    let time = format!("TIME={:.2e}", start_time.elapsed().unwrap().as_secs_f64());
+
+    println!("{}, {}, {}, {}", progress, candidate, phi, time);
+}
+
+pub fn search_complex(current_state: usize, tpm: &na::DMatrix<f64>, num_threads: usize, log: bool) -> Complex {
+    let system_basis = BitBasis::construct_from_max_image_size(tpm.ncols());
+    let max_image_size = system_basis.max_image_size();
+
+    let total_count = max_image_size - 1;
+
+    let mut current_complex: Option<Complex> = None;
+
+    (1..max_image_size).for_each(|mask| {
+        let start_time = SystemTime::now();
+
+        let candidate_elements: Vec<usize> = (0..system_basis.max_dim).filter(|&i| mask & USIZE_BASIS[i] != 0).collect();
+        let candidate_basis = system_basis.sub_basis(candidate_elements.as_slice());
+
+        let marginal = Arc::new(calc_fixed_marginal_tpm(&candidate_basis, current_state, &tpm));
+
+        let constellation = search_constellation_with_mip(current_state, &marginal, num_threads);
+
+        if log {
+            notify_progress(&&candidate_elements, constellation.mip.phi, mask, total_count, start_time);
+        };
+
+        let update = if let Some(complex) = &current_complex {
+            constellation.mip.phi > complex.constellation.mip.phi
+        } else {
+            true
+        };
+
+        if update {
+            current_complex = Some(Complex {
+                elements: candidate_elements,
+                marginal_tpm: Arc::try_unwrap(marginal).unwrap(),
+                constellation: constellation,
+            });
+        };
+    });
+
+    current_complex.unwrap()
 }

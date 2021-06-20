@@ -1,4 +1,4 @@
-use std::usize;
+use std::{sync::Arc, usize};
 use nalgebra as na;
 use crate::{basis::BitBasis, compare::{Comparison, compare_roughly}, emd::{calc_constellation_emd, calc_repertoire_emd}, mechanism::{generate_all_repertoire_parts, search_concept_with_parts}, partition::SystemPartition, repertoire::{calc_cause_repertoire, calc_effect_repertoire, normalize_repertoire}, system::{search_complex, search_constellation_with_mip, search_constellation_with_parts}, tpm::calc_partitioned_marginal_tpm};
 
@@ -384,9 +384,9 @@ fn test_calc_constellation_emd() {
 #[test]
 fn test_search_constellation_with_mip() {
     let current_state = generate_reference_state();
-    let tpm = generate_reference_tpm();
+    let tpm = Arc::new(generate_reference_tpm());
 
-    let constellation = search_constellation_with_mip(current_state, &tpm);
+    let constellation = search_constellation_with_mip(current_state, &tpm, 1);
     let mip = constellation.mip;
 
     assert_eq!(mip.partition.cut_from, [0, 1]);
@@ -399,7 +399,7 @@ fn test_search_complex() {
     let current_state = generate_reference_state();
     let tpm = generate_reference_tpm();
 
-    let complex = search_complex(current_state, tpm, 2, false);
+    let complex = search_complex(current_state, &tpm, 2, false);
 
     assert_eq!(complex.elements, [0, 1, 2]);
     assert_almost_equal_scalar(complex.constellation.mip.phi, 1.9166666666);
